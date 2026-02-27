@@ -79,9 +79,12 @@ class GardenExpense(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    # Explicit foreign_keys to resolve ambiguity
-    user: Mapped["User"] = relationship(foreign_keys=[user_id], lazy="selectin")  # noqa: F821
-    confirmed_by: Mapped["User | None"] = relationship(foreign_keys=[confirmed_by_id], lazy="selectin")  # noqa: F821
+    user: Mapped["User"] = relationship(  # noqa: F821
+        foreign_keys="[GardenExpense.user_id]", lazy="selectin"
+    )
+    confirmed_by: Mapped["User | None"] = relationship(  # noqa: F821
+        foreign_keys="[GardenExpense.confirmed_by_id]", lazy="selectin"
+    )
     category: Mapped["ExpenseCategory | None"] = relationship(lazy="selectin")
 
 
