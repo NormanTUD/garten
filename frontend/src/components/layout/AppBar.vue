@@ -23,13 +23,13 @@ async function handleLogout() {
     />
 
     <v-app-bar-title>
-      <v-icon icon="mdi-sprout" class="mr-2" />
-      GartenApp
+      <v-icon icon="mdi-sprout" />
+      <span class="d-none d-sm-inline ml-2">GartenApp</span>
     </v-app-bar-title>
 
     <v-spacer />
 
-    <v-chip variant="text" class="mr-2">
+    <v-chip variant="text" class="mr-2 d-none d-sm-flex">
       <v-icon start icon="mdi-account" />
       {{ auth.displayName }}
     </v-chip>
@@ -37,3 +37,4 @@ async function handleLogout() {
     <v-btn icon="mdi-logout" @click="handleLogout" />
   </v-app-bar>
 </template>
+
