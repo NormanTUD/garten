@@ -52,7 +52,9 @@ interface MemberBalance {
   user_id: number;
   display_name: string;
   total_paid_cents: number;
-  share_cents: number;
+  share_recurring_cents: number;
+  share_onetime_cents: number;
+  share_total_cents: number;
   remaining_cents: number;
 }
 
@@ -311,7 +313,10 @@ async function deleteRecurring(id: number) {
             {{ balanceText(myBalance.remaining_cents) }}
           </div>
           <div class="text-caption mt-1">
-            Soll: {{ eur(myBalance.share_cents) }} · Bezahlt: {{ eur(myBalance.total_paid_cents) }}
+            Soll: {{ eur(myBalance.share_total_cents) }} · Bezahlt: {{ eur(myBalance.total_paid_cents) }}
+          </div>
+          <div class="text-caption">
+            ({{ eur(myBalance.share_recurring_cents) }} laufend + {{ eur(myBalance.share_onetime_cents) }} Einmal-Umlagen)
           </div>
         </v-card-text>
       </v-card>
