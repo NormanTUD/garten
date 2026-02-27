@@ -172,11 +172,23 @@ async def list_payments(
 
 @payment_router.post("/", response_model=MemberPaymentRead, status_code=status.HTTP_201_CREATED)
 async def create_payment(data: MemberPaymentCreate, user: CurrentUser, db: DBSession):
-    """Create a payment into the garden fund. user_id from JWT."""
+    """Create a payment into the garden fund.
+
+    - Normal user: payment is for themselves
+    - Admin: can set for_user_id to credit another user
+    """
+    if data.for_user_id is not None and data.for_user_id != user.id:
+        if user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin can create payments for other users",
+            )
+    # If no for_user_id set, it's for the current user
+    if data.for_user_id is None:
+        data.for_user_id = user.id
     payment = await service.create_payment(db, user.id, data)
     await db.refresh(payment)
     return payment
-
 
 @payment_router.get("/{payment_id}", response_model=MemberPaymentRead)
 async def get_payment(payment_id: int, user: CurrentUser, db: DBSession):

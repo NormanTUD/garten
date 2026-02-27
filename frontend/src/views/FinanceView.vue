@@ -90,6 +90,7 @@ const expenseForm = ref({
   description: "",
   category_name: "",
   expense_date: new Date().toISOString().split("T")[0],
+  is_shared: true,
   receipt_image_path: null as string | null,
   notes: "",
 });
@@ -182,6 +183,7 @@ function openExpenseDialog() {
     description: "",
     category_name: "",
     expense_date: new Date().toISOString().split("T")[0],
+    is_shared: true,
     receipt_image_path: null,
     notes: "",
   };
@@ -195,12 +197,11 @@ async function saveExpense() {
     amount_cents: Math.round(expenseForm.value.amount * 100),
     description: expenseForm.value.description,
     expense_date: expenseForm.value.expense_date,
+    is_shared: expenseForm.value.is_shared,
   };
 
-  // Dynamic category: strip emoji prefix if present
   if (expenseForm.value.category_name) {
     const raw = expenseForm.value.category_name.trim();
-    // Check if it matches an existing category (with emoji prefix)
     const existing = categories.value.find(
       (c) => (c.icon ? c.icon + " " : "") + c.name === raw
     );
@@ -211,9 +212,7 @@ async function saveExpense() {
     }
   }
 
-  if (expenseForm.value.receipt_image_path) {
-    data.receipt_image_path = expenseForm.value.receipt_image_path;
-  }
+  if (expenseForm.value.receipt_image_path) data.receipt_image_path = expenseForm.value.receipt_image_path;
   if (expenseForm.value.notes) data.notes = expenseForm.value.notes;
 
   await api.post("/finance/expenses/", data);
@@ -786,6 +785,14 @@ async function deleteRecurring(id: number) {
               type="date"
               variant="outlined"
               density="comfortable"
+              class="mb-3"
+            />
+            <v-checkbox
+              v-model="expenseForm.is_shared"
+              label="Auf alle Mitglieder umlegen"
+              hint="Wenn deaktiviert, wird dieser Posten nicht in die Jahreskosten eingerechnet"
+              persistent-hint
+              color="primary"
               class="mb-3"
             />
 

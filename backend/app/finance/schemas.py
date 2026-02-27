@@ -76,10 +76,11 @@ class RecurringCostRead(BaseModel):
 
 class GardenExpenseCreate(BaseModel):
     category_id: int | None = None
-    category_name: str | None = None  # Dynamic: if set and not found, create it
+    category_name: str | None = None
     amount_cents: int = Field(..., gt=0)
     description: str = Field(..., min_length=1, max_length=500)
     expense_date: date
+    is_shared: bool = True  # NEU: auf alle umlegen?
     receipt_image_path: str | None = None
     notes: str | None = None
 
@@ -89,6 +90,7 @@ class GardenExpenseUpdate(BaseModel):
     amount_cents: int | None = Field(default=None, gt=0)
     description: str | None = Field(default=None, min_length=1, max_length=500)
     expense_date: date | None = None
+    is_shared: bool | None = None  # NEU
     receipt_image_path: str | None = None
     notes: str | None = None
 
@@ -103,21 +105,38 @@ class GardenExpenseRead(BaseModel):
     amount_cents: int
     description: str
     expense_date: date
+    is_shared: bool  # NEU
     receipt_image_path: str | None
     notes: str | None
     created_at: datetime
-
 
 # ─── Member Payment ────────────────────────────────────────────────
 
 class MemberPaymentCreate(BaseModel):
     amount_cents: int = Field(..., gt=0)
     payment_type: str = Field(..., pattern=r"^(cash|transfer|material)$")
+    for_user_id: int | None = None  # NEU: Admin kann für anderen eintragen
     description: str | None = Field(default=None, max_length=500)
     payment_date: date
     receipt_image_path: str | None = None
     notes: str | None = None
 
+
+class MemberPaymentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    user_id: int
+    user: UserSummary
+    for_user_id: int | None  # NEU
+    for_user: UserSummary | None  # NEU
+    amount_cents: int
+    payment_type: str
+    description: str | None
+    payment_date: date
+    receipt_image_path: str | None
+    confirmed_by_admin: bool
+    notes: str | None
+    created_at: datetime
 
 class MemberPaymentUpdate(BaseModel):
     amount_cents: int | None = Field(default=None, gt=0)
@@ -128,20 +147,6 @@ class MemberPaymentUpdate(BaseModel):
     confirmed_by_admin: bool | None = None
     notes: str | None = None
 
-
-class MemberPaymentRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    user_id: int
-    user: UserSummary
-    amount_cents: int
-    payment_type: str
-    description: str | None
-    payment_date: date
-    receipt_image_path: str | None
-    confirmed_by_admin: bool
-    notes: str | None
-    created_at: datetime
 
 
 # ─── Garden Fund Balance ───────────────────────────────────────────

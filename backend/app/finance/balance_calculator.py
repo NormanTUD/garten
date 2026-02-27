@@ -28,11 +28,12 @@ async def calculate_fund_overview(
     total_yearly = sum(c.amount_cents for c in recurring_costs if c.interval == "yearly")
     total_recurring_annual = (total_monthly * 12) + total_yearly
 
-    # ─── One-time expenses this year ───────────────────────────
+    # ─── One-time expenses this year (ONLY shared ones) ────────
     onetime_result = await db.execute(
         select(func.coalesce(func.sum(GardenExpense.amount_cents), 0))
         .where(GardenExpense.expense_date >= year_start)
         .where(GardenExpense.expense_date <= year_end)
+        .where(GardenExpense.is_shared.is_(True))
     )
     total_onetime = onetime_result.scalar() or 0
 
@@ -45,19 +46,20 @@ async def calculate_fund_overview(
     members = list(members_result.scalars().all())
     member_count = len(members) or 1
 
-    # Getrennte Anteile
     share_recurring_annual = total_recurring_annual // member_count
     share_recurring_monthly = share_recurring_annual // 12
     share_onetime = total_onetime // member_count
     share_total_annual = total_costs_annual // member_count
     share_total_monthly = share_total_annual // 12
 
-    # ─── Payments this year per member ─────────────────────────
+    # ─── Payments this year per member (use for_user_id) ───────
+    # Payments are credited to for_user_id (the beneficiary)
     payments_result = await db.execute(
-        select(MemberPayment.user_id, func.coalesce(func.sum(MemberPayment.amount_cents), 0))
+        select(MemberPayment.for_user_id, func.coalesce(func.sum(MemberPayment.amount_cents), 0))
         .where(MemberPayment.payment_date >= year_start)
         .where(MemberPayment.payment_date <= year_end)
-        .group_by(MemberPayment.user_id)
+        .where(MemberPayment.for_user_id.is_not(None))
+        .group_by(MemberPayment.for_user_id)
     )
     payments_map = dict(payments_result.all())
 

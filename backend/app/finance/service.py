@@ -206,12 +206,12 @@ async def get_payment_by_id(db: AsyncSession, payment_id: int) -> MemberPayment 
 async def create_payment(
     db: AsyncSession, user_id: int, data: MemberPaymentCreate
 ) -> MemberPayment:
-    payment = MemberPayment(user_id=user_id, **data.model_dump())
+    payment_data = data.model_dump()
+    payment = MemberPayment(user_id=user_id, **payment_data)
     db.add(payment)
     await db.flush()
     await db.refresh(payment)
     return payment
-
 
 async def update_payment(
     db: AsyncSession, payment: MemberPayment, data: MemberPaymentUpdate

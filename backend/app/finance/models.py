@@ -28,7 +28,6 @@ class ExpenseCategory(Base):
 
 
 class RecurringCost(Base):
-    """Monthly or yearly base costs (rent, water, insurance, etc.)."""
     __tablename__ = "recurring_costs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -37,7 +36,7 @@ class RecurringCost(Base):
     )
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
-    interval: Mapped[str] = mapped_column(String(20), nullable=False)  # monthly, yearly
+    interval: Mapped[str] = mapped_column(String(20), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -48,7 +47,6 @@ class RecurringCost(Base):
 
 
 class GardenExpense(Base):
-    """One-time expenses (tools, seeds, materials, etc.)."""
     __tablename__ = "garden_expenses"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -61,6 +59,7 @@ class GardenExpense(Base):
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     expense_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    is_shared: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     receipt_image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     ocr_raw_result: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -73,15 +72,17 @@ class GardenExpense(Base):
 
 
 class MemberPayment(Base):
-    """Payments from members into the garden fund."""
     __tablename__ = "member_payments"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    for_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
-    payment_type: Mapped[str] = mapped_column(String(20), nullable=False)  # cash, transfer, material
+    payment_type: Mapped[str] = mapped_column(String(20), nullable=False)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
     payment_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     receipt_image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -91,5 +92,6 @@ class MemberPayment(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    user: Mapped["User"] = relationship(lazy="selectin")  # noqa: F821
+    user: Mapped["User"] = relationship(foreign_keys=[user_id], lazy="selectin")  # noqa: F821
+    for_user: Mapped["User | None"] = relationship(foreign_keys=[for_user_id], lazy="selectin")  # noqa: F821
 

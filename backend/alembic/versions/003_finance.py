@@ -66,6 +66,7 @@ def upgrade() -> None:
             "created_at", sa.DateTime(timezone=True), nullable=False,
             server_default=sa.func.now(),
         ),
+        sa.Column("is_shared", sa.Boolean(), nullable=False, server_default=sa.text("1")),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["category_id"], ["expense_categories.id"], ondelete="SET NULL"),
@@ -78,8 +79,9 @@ def upgrade() -> None:
         "member_payments",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column("for_user_id", sa.Integer(), nullable=True),
         sa.Column("amount_cents", sa.Integer(), nullable=False),
-        sa.Column("payment_type", sa.String(20), nullable=False),  # cash, transfer, material
+        sa.Column("payment_type", sa.String(20), nullable=False),
         sa.Column("description", sa.String(500), nullable=True),
         sa.Column("payment_date", sa.Date(), nullable=False),
         sa.Column("receipt_image_path", sa.String(500), nullable=True),
@@ -91,8 +93,10 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["for_user_id"], ["users.id"], ondelete="SET NULL"),
     )
     op.create_index("ix_member_payments_user_id", "member_payments", ["user_id"])
+    op.create_index("ix_member_payments_for_user_id", "member_payments", ["for_user_id"])
     op.create_index("ix_member_payments_payment_date", "member_payments", ["payment_date"])
 
 
