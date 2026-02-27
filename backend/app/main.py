@@ -39,8 +39,15 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down %s", settings.app_name)
 
 
-def create_app() -> FastAPI:
-    """Application factory."""
+def create_app(
+    audit_session_factory=None,
+) -> FastAPI:
+    """Application factory.
+
+    Args:
+        audit_session_factory: Optional session factory for audit middleware.
+                               Used in tests to inject the test DB session.
+    """
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -51,7 +58,7 @@ def create_app() -> FastAPI:
     )
 
     setup_logging()
-    setup_middleware(app)
+    setup_middleware(app, audit_session_factory=audit_session_factory)
     setup_routers(app)
 
     return app
@@ -66,9 +73,9 @@ def setup_logging() -> None:
     )
 
 
-def setup_middleware(app: FastAPI) -> None:
+def setup_middleware(app: FastAPI, audit_session_factory=None) -> None:
     # Audit log middleware (outermost = runs first)
-    app.add_middleware(AuditLogMiddleware)
+    app.add_middleware(AuditLogMiddleware, session_factory=audit_session_factory)
 
     app.add_middleware(
         CORSMiddleware,
@@ -99,3 +106,4 @@ def setup_routers(app: FastAPI) -> None:
 
 
 app = create_app()
+
