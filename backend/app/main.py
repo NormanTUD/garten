@@ -83,7 +83,9 @@ def setup_routers(app: FastAPI) -> None:
     from app.auth.router import user_router
     from app.beds.router import planting_router, router as beds_router
     from app.garden.router import router as garden_router
+    from app.harvest.router import router as harvest_router
     from app.plants.router import router as plants_router
+    from app.watering.router import fertilizing_router, watering_router
 
     app.include_router(auth_router)
     app.include_router(user_router)
@@ -92,6 +94,9 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(beds_router)
     app.include_router(planting_router)
     app.include_router(plants_router)
+    app.include_router(harvest_router)
+    app.include_router(watering_router)
+    app.include_router(fertilizing_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():
