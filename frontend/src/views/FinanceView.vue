@@ -472,7 +472,6 @@ async function deleteRecurring(id: number) {
                   </tr>
                 </tbody>
               </v-table>
-
               <!-- Gesamtrechnung -->
               <v-divider class="mb-3" />
               <div class="text-subtitle-2 font-weight-bold mb-2">
@@ -480,59 +479,143 @@ async function deleteRecurring(id: number) {
                 Gesamtrechnung {{ new Date().getFullYear() }}
               </div>
               <v-table density="compact">
+                <thead>
+                  <tr>
+                    <th>Posten</th>
+                    <th class="text-right">Betrag</th>
+                    <th class="text-right">× Intervall</th>
+                    <th class="text-right">Pro Jahr</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  <tr>
-                    <td>Laufende Kosten / Jahr</td>
-                    <td class="text-right">{{ eur(fund.total_recurring_annual_cents) }}</td>
+                  <!-- Laufende Kosten einzeln -->
+                  <tr v-for="r in recurring" :key="'calc-' + r.id" class="text-body-2">
+                    <td>
+                      <v-icon icon="mdi-repeat" size="x-small" class="mr-1 text-medium-emphasis" />
+                      {{ r.description }}
+                    </td>
+                    <td class="text-right">{{ eur(r.amount_cents) }}</td>
                     <td class="text-right text-medium-emphasis">
-                      pro Person: {{ eur(fund.share_recurring_per_member_annual_cents) }}
+                      {{ r.interval === 'monthly' ? '× 12 Monate' : '× 1 Jahr' }}
+                    </td>
+                    <td class="text-right">
+                      {{ eur(r.interval === 'monthly' ? r.amount_cents * 12 : r.amount_cents) }}
                     </td>
                   </tr>
-                  <tr>
-                    <td>+ Einmal-Ausgaben {{ new Date().getFullYear() }}</td>
-                    <td class="text-right">{{ eur(fund.total_onetime_expenses_cents) }}</td>
-                    <td class="text-right text-medium-emphasis">
-                      pro Person: {{ eur(fund.share_onetime_per_member_cents) }}
-                    </td>
-                  </tr>
+
+                  <!-- Zwischensumme laufend -->
                   <tr class="bg-grey-lighten-4">
-                    <td class="font-weight-bold">= Gesamtkosten / Jahr</td>
-                    <td class="text-right font-weight-bold">{{ eur(fund.total_costs_annual_cents) }}</td>
+                    <td class="font-weight-bold" colspan="3">
+                      Σ Laufende Kosten / Jahr
+                    </td>
                     <td class="text-right font-weight-bold">
-                      pro Person: {{ eur(fund.share_total_per_member_annual_cents) }}
+                      {{ eur(fund.total_recurring_annual_cents) }}
                     </td>
                   </tr>
-                  <tr>
-                    <td colspan="2"></td>
-                    <td></td>
+
+                  <!-- Einzelposten -->
+                  <tr v-for="e in expenses.filter(x => x.is_shared)" :key="'calc-e-' + e.id" class="text-body-2">
+                    <td>
+                      <v-icon icon="mdi-receipt" size="x-small" class="mr-1 text-medium-emphasis" />
+                      {{ e.description }}
+                      <v-chip v-if="e.category" size="x-small" class="ml-1" variant="tonal">
+                        {{ e.category.icon || '' }} {{ e.category.name }}
+                      </v-chip>
+                    </td>
+                    <td class="text-right">{{ eur(e.amount_cents) }}</td>
+                    <td class="text-right text-medium-emphasis">
+                      {{ new Date(e.expense_date).toLocaleDateString('de-DE') }}
+                    </td>
+                    <td class="text-right">{{ eur(e.amount_cents) }}</td>
                   </tr>
+
+                  <!-- Nicht umgelegte Posten (info) -->
+                  <tr v-for="e in expenses.filter(x => !x.is_shared)" :key="'calc-ns-' + e.id" class="text-body-2 text-medium-emphasis">
+                    <td>
+                      <v-icon icon="mdi-receipt-text-minus" size="x-small" class="mr-1" />
+                      {{ e.description }}
+                      <v-chip size="x-small" color="warning" variant="flat" class="ml-1">nicht umgelegt</v-chip>
+                    </td>
+                    <td class="text-right">{{ eur(e.amount_cents) }}</td>
+                    <td class="text-right">
+                      {{ new Date(e.expense_date).toLocaleDateString('de-DE') }}
+                    </td>
+                    <td class="text-right">—</td>
+                  </tr>
+
+                  <!-- Zwischensumme Einzelposten -->
+                  <tr v-if="fund.total_onetime_expenses_cents > 0" class="bg-grey-lighten-4">
+                    <td class="font-weight-bold" colspan="3">
+                      Σ Einmal-Ausgaben (umgelegt)
+                    </td>
+                    <td class="text-right font-weight-bold">
+                      {{ eur(fund.total_onetime_expenses_cents) }}
+                    </td>
+                  </tr>
+
+                  <!-- Leerzeile -->
+                  <tr><td colspan="4" class="pa-1"></td></tr>
+
+                  <!-- GESAMT -->
                   <tr class="bg-primary-lighten-5">
-                    <td class="font-weight-bold text-primary" colspan="2">
-                      Grundbeitrag (nur laufende Kosten)
+                    <td class="font-weight-bold text-primary" colspan="3">
+                      = Gesamtkosten {{ new Date().getFullYear() }}
                     </td>
                     <td class="text-right font-weight-bold text-primary text-h6">
+                      {{ eur(fund.total_costs_annual_cents) }}
+                    </td>
+                  </tr>
+
+                  <!-- Leerzeile -->
+                  <tr><td colspan="4" class="pa-1"></td></tr>
+
+                  <!-- Aufteilung -->
+                  <tr>
+                    <td colspan="3" class="text-medium-emphasis">
+                      ÷ {{ fund.member_count }} Mitglieder
+                    </td>
+                    <td></td>
+                  </tr>
+                  <tr>
+                    <td class="pl-6">davon laufende Kosten</td>
+                    <td colspan="2" class="text-right text-medium-emphasis">
                       {{ eur(fund.share_recurring_per_member_monthly_cents) }} / Monat
+                    </td>
+                    <td class="text-right">
+                      {{ eur(fund.share_recurring_per_member_annual_cents) }} / Jahr
                     </td>
                   </tr>
                   <tr v-if="fund.share_onetime_per_member_cents > 0">
-                    <td class="text-medium-emphasis" colspan="2">
-                      + Einmal-Umlage ({{ new Date().getFullYear() }})
-                    </td>
-                    <td class="text-right font-weight-bold">
+                    <td class="pl-6">davon Einmal-Umlagen</td>
+                    <td colspan="2"></td>
+                    <td class="text-right">
                       {{ eur(fund.share_onetime_per_member_cents) }} einmalig
+                    </td>
+                  </tr>
+
+                  <!-- Leerzeile -->
+                  <tr><td colspan="4" class="pa-1"></td></tr>
+
+                  <!-- Endergebnis -->
+                  <tr class="bg-primary-lighten-5">
+                    <td class="font-weight-bold text-primary" colspan="2">
+                      Grundbeitrag (laufend)
+                    </td>
+                    <td class="text-right font-weight-bold text-primary text-h6" colspan="2">
+                      {{ eur(fund.share_recurring_per_member_monthly_cents) }} / Monat
                     </td>
                   </tr>
                   <tr class="bg-primary-lighten-5">
                     <td class="font-weight-bold text-primary" colspan="2">
-                      Gesamt-Soll / Person / Jahr
+                      Gesamt-Soll pro Person
                     </td>
-                    <td class="text-right font-weight-bold text-primary text-h6">
-                      {{ eur(fund.share_total_per_member_annual_cents) }}
+                    <td class="text-right font-weight-bold text-primary text-h6" colspan="2">
+                      {{ eur(fund.share_total_per_member_annual_cents) }} / Jahr
                     </td>
                   </tr>
                 </tbody>
               </v-table>
-            </v-expansion-panel-text>
+	    </v-expansion-panel-text>
           </v-expansion-panel>
         </v-expansion-panels>
 
