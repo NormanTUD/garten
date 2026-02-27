@@ -44,6 +44,13 @@ const routes = [
     component: () => import("@/views/AdminView.vue"),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
+  {
+	  path: "/messages",
+	  name: "messages",
+	  component: () => import("@/views/MessagesView.vue"),
+		  meta: { requiresAuth: true },
+  },
+
 ];
 
 const router = createRouter({

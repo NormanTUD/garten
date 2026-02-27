@@ -13,6 +13,7 @@ const navItems = [
   { title: "Ernte", icon: "mdi-basket", to: "/harvest" },
   { title: "Bewässerung", icon: "mdi-water", to: "/watering" },
   { title: "Finanzen", icon: "mdi-cash-register", to: "/finance" },
+  { title: "Nachrichten", icon: "mdi-email", to: "/messages" },
 ];
 
 const adminItems = [
