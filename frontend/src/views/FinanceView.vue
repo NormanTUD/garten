@@ -377,7 +377,7 @@ async function deleteRecurring(id: number) {
               <span class="text-body-2">So setzt sich "Pro Person/Monat" zusammen</span>
             </v-expansion-panel-title>
             <v-expansion-panel-text>
-              <!-- Laufende monatliche Kosten -->
+	      <!-- Laufende monatliche Kosten -->
               <div class="text-subtitle-2 font-weight-bold mb-2">
                 <v-icon icon="mdi-repeat" size="small" class="mr-1" />
                 Laufende Kosten
@@ -392,32 +392,75 @@ async function deleteRecurring(id: number) {
                   <tr>
                     <th>Posten</th>
                     <th class="text-right">Betrag</th>
-                    <th class="text-right">Intervall</th>
+                    <th class="text-right">Pro Monat</th>
                     <th class="text-right">Pro Jahr</th>
+                    <th v-if="auth.isAdmin" class="text-right" style="width: 40px"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="r in recurring" :key="r.id">
-                    <td>{{ r.description }}</td>
-                    <td class="text-right">{{ eur(r.amount_cents) }}</td>
-                    <td class="text-right">{{ intervalLabel(r.interval) }}</td>
-                    <td class="text-right font-weight-bold">
-                      {{ eur(r.interval === "monthly" ? r.amount_cents * 12 : r.amount_cents) }}
-                      <v-btn
-                        v-if="auth.isAdmin"
-                        size="x-small"
-                        icon="mdi-delete"
-                        variant="text"
-                        color="error"
-                        density="compact"
-                        class="ml-1"
-                        @click="deleteRecurring(r.id)"
-                      />
+                  <!-- Monatliche Posten -->
+                  <tr v-if="recurring.filter(r => r.interval === 'monthly').length > 0" class="bg-grey-lighten-5">
+                    <td colspan="5" class="text-caption font-weight-bold text-medium-emphasis py-1">
+                      Monatliche Kosten
                     </td>
                   </tr>
-                  <tr class="bg-grey-lighten-4">
-                    <td colspan="3" class="font-weight-bold">Summe laufende Kosten / Jahr</td>
-                    <td class="text-right font-weight-bold">{{ eur(fund.total_recurring_annual_cents) }}</td>
+                  <tr v-for="r in recurring.filter(r => r.interval === 'monthly')" :key="'m-' + r.id">
+                    <td>
+                      {{ r.description }}
+                      <span v-if="r.notes" class="text-caption text-medium-emphasis ml-1">({{ r.notes }})</span>
+                    </td>
+                    <td class="text-right text-medium-emphasis">{{ eur(r.amount_cents) }} / Monat</td>
+                    <td class="text-right font-weight-bold">{{ eur(r.amount_cents) }}</td>
+                    <td class="text-right">{{ eur(r.amount_cents * 12) }}</td>
+                    <td v-if="auth.isAdmin" class="text-right">
+                      <v-btn size="x-small" icon="mdi-delete" variant="text" color="error" density="compact" @click="deleteRecurring(r.id)" />
+                    </td>
+                  </tr>
+
+                  <!-- Zwischensumme monatlich -->
+                  <tr v-if="recurring.filter(r => r.interval === 'monthly').length > 0" class="bg-grey-lighten-4">
+                    <td class="font-weight-bold" colspan="2">Σ Monatliche Kosten</td>
+                    <td class="text-right font-weight-bold">{{ eur(fund.total_recurring_monthly_cents) }}</td>
+                    <td class="text-right font-weight-bold">{{ eur(fund.total_recurring_monthly_cents * 12) }}</td>
+                    <td v-if="auth.isAdmin"></td>
+                  </tr>
+
+                  <!-- Jährliche Posten -->
+                  <tr v-if="recurring.filter(r => r.interval === 'yearly').length > 0" class="bg-grey-lighten-5">
+                    <td colspan="5" class="text-caption font-weight-bold text-medium-emphasis py-1">
+                      Jährliche Kosten
+                    </td>
+                  </tr>
+                  <tr v-for="r in recurring.filter(r => r.interval === 'yearly')" :key="'y-' + r.id">
+                    <td>
+                      {{ r.description }}
+                      <span v-if="r.notes" class="text-caption text-medium-emphasis ml-1">({{ r.notes }})</span>
+                    </td>
+                    <td class="text-right text-medium-emphasis">{{ eur(r.amount_cents) }} / Jahr</td>
+                    <td class="text-right">{{ eur(Math.round(r.amount_cents / 12)) }}</td>
+                    <td class="text-right font-weight-bold">{{ eur(r.amount_cents) }}</td>
+                    <td v-if="auth.isAdmin" class="text-right">
+                      <v-btn size="x-small" icon="mdi-delete" variant="text" color="error" density="compact" @click="deleteRecurring(r.id)" />
+                    </td>
+                  </tr>
+
+                  <!-- Zwischensumme jährlich -->
+                  <tr v-if="recurring.filter(r => r.interval === 'yearly').length > 0" class="bg-grey-lighten-4">
+                    <td class="font-weight-bold" colspan="2">Σ Jährliche Kosten</td>
+                    <td class="text-right font-weight-bold">{{ eur(Math.round(fund.total_recurring_yearly_cents / 12)) }}</td>
+                    <td class="text-right font-weight-bold">{{ eur(fund.total_recurring_yearly_cents) }}</td>
+                    <td v-if="auth.isAdmin"></td>
+                  </tr>
+
+                  <!-- Leerzeile -->
+                  <tr><td colspan="5" class="pa-1"></td></tr>
+
+                  <!-- Gesamtsumme laufend -->
+                  <tr class="bg-primary-lighten-5">
+                    <td class="font-weight-bold text-primary" colspan="2">Σ Alle laufenden Kosten</td>
+                    <td class="text-right font-weight-bold text-primary">{{ eur(Math.round(fund.total_recurring_annual_cents / 12)) }}</td>
+                    <td class="text-right font-weight-bold text-primary">{{ eur(fund.total_recurring_annual_cents) }}</td>
+                    <td v-if="auth.isAdmin"></td>
                   </tr>
                 </tbody>
               </v-table>
