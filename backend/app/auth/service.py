@@ -55,13 +55,18 @@ async def change_password(db: AsyncSession, user: User, new_password: str) -> No
     logger.info("Password changed for user: %s", user.username)
 
 
+def verify_password_for_user(user: User, plain_password: str) -> bool:
+    """Verify a plain password against the user's stored hash."""
+    return verify_password(plain_password, user.password_hash)
+
+
 async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
     user = await get_user_by_username(db, username)
     if user is None:
         return None
     if not user.is_active:
         return None
-    if not verify_password(password, user.password_hash):
+    if not verify_password(plain_password=password, hashed_password=user.password_hash):
         return None
     return user
 
