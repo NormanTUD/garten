@@ -14,6 +14,8 @@ from app.audit.models import AuditLog  # noqa: F401
 from app.garden.models import Garden  # noqa: F401
 from app.beds.models import Bed, BedPlanting  # noqa: F401
 from app.plants.models import Plant  # noqa: F401
+from app.harvest.models import Harvest  # noqa: F401
+from app.watering.models import FertilizingEvent, WateringEvent  # noqa: F401
 
 config = context.config
 
@@ -24,14 +26,13 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
     url = settings.async_database_url
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        render_as_batch=True,  # Required for SQLite ALTER TABLE
+        render_as_batch=True,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -41,14 +42,13 @@ def do_run_migrations(connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        render_as_batch=True,  # Required for SQLite ALTER TABLE
+        render_as_batch=True,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 async def run_migrations_online() -> None:
-    """Run migrations in 'online' mode with async engine."""
     connectable = create_async_engine(
         settings.async_database_url,
         poolclass=pool.NullPool,
@@ -62,3 +62,4 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     asyncio.run(run_migrations_online())
+
