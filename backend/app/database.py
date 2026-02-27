@@ -15,8 +15,8 @@ engine = create_async_engine(
         "timeout": 30,
     },
     pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10,
+    pool_size=1,        # SQLite: nur 1 Connection
+    max_overflow=0,     # Keine zusätzlichen Connections
 )
 
 
