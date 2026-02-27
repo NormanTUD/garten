@@ -145,30 +145,38 @@ class MemberPaymentRead(BaseModel):
 
 
 # ─── Garden Fund Balance ───────────────────────────────────────────
-
 class MemberBalance(BaseModel):
     user_id: int
     display_name: str
-    total_paid_cents: int       # Total payments into the fund
-    share_cents: int            # What this member should pay (total costs / members)
-    remaining_cents: int        # share - paid (positive = still owes, negative = overpaid)
+    total_paid_cents: int
+    share_recurring_cents: int    # Anteil laufende Kosten
+    share_onetime_cents: int      # Anteil Einmal-Ausgaben
+    share_total_cents: int        # Gesamt-Soll
+    remaining_cents: int          # share_total - paid
 
 
 class GardenFundOverview(BaseModel):
-    # Cost side
+    # Laufende Kosten
     total_recurring_monthly_cents: int
     total_recurring_yearly_cents: int
-    total_recurring_annual_cents: int   # monthly*12 + yearly
+    total_recurring_annual_cents: int       # monthly*12 + yearly
+
+    # Einmal-Ausgaben
     total_onetime_expenses_cents: int
-    total_costs_annual_cents: int       # recurring_annual + onetime (this year)
 
-    # Payment side
+    # Gesamt
+    total_costs_annual_cents: int           # recurring_annual + onetime
+
+    # Zahlungen
     total_payments_cents: int
-    fund_balance_cents: int             # payments - onetime expenses (how much is in the fund)
+    fund_balance_cents: int
 
-    # Per member
-    share_per_member_annual_cents: int  # total_costs_annual / active members
-    share_per_member_monthly_cents: int # share_annual / 12
+    # Pro Mitglied
+    share_recurring_per_member_annual_cents: int
+    share_recurring_per_member_monthly_cents: int
+    share_onetime_per_member_cents: int
+    share_total_per_member_annual_cents: int
+    share_total_per_member_monthly_cents: int
     member_count: int
     member_balances: list[MemberBalance]
 

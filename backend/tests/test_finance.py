@@ -320,7 +320,7 @@ async def test_fund_overview_with_recurring(client: AsyncClient, admin_user):
 
 
 async def test_fund_overview_with_expenses_and_payments(client: AsyncClient, admin_user, normal_user):
-    """Full scenario: recurring costs + one-time expense + payments."""
+    """Full scenario: recurring + one-time + payments, with separate shares."""
     admin, admin_token = admin_user
     user, user_token = normal_user
 
@@ -330,10 +330,10 @@ async def test_fund_overview_with_expenses_and_payments(client: AsyncClient, adm
 
     # One-time expense: 2000
     await client.post("/api/finance/expenses/", headers=auth_header(admin_token),
-                      json={"amount_cents": 2000, "description": "Erde", "expense_date": "2026-04-10"})
+                      json={"amount_cents": 2000, "description": "Rasenmäher", "expense_date": "2026-04-10"})
 
-    # Total annual costs: 60000 + 2000 = 62000
-    # 2 members → 31000 per person
+    # Total: recurring 60000 + onetime 2000 = 62000
+    # 2 members → recurring share 30000, onetime share 1000, total share 31000
 
     # Admin pays 20000
     await client.post("/api/finance/payments/", headers=auth_header(admin_token),
@@ -346,22 +346,27 @@ async def test_fund_overview_with_expenses_and_payments(client: AsyncClient, adm
     resp = await client.get("/api/finance/fund/", headers=auth_header(admin_token))
     data = resp.json()
 
+    assert data["total_recurring_annual_cents"] == 60000
+    assert data["total_onetime_expenses_cents"] == 2000
     assert data["total_costs_annual_cents"] == 62000
     assert data["member_count"] == 2
-    assert data["share_per_member_annual_cents"] == 31000
-    assert data["total_payments_cents"] == 30000
 
-    # Check per-member balances
+    # Separate shares
+    assert data["share_recurring_per_member_annual_cents"] == 30000
+    assert data["share_recurring_per_member_monthly_cents"] == 2500
+    assert data["share_onetime_per_member_cents"] == 1000
+    assert data["share_total_per_member_annual_cents"] == 31000
+
+    # Per-member
     admin_balance = next(b for b in data["member_balances"] if b["user_id"] == admin.id)
-    user_balance = next(b for b in data["member_balances"] if b["user_id"] == user.id)
-
+    assert admin_balance["share_recurring_cents"] == 30000
+    assert admin_balance["share_onetime_cents"] == 1000
+    assert admin_balance["share_total_cents"] == 31000
     assert admin_balance["total_paid_cents"] == 20000
-    assert admin_balance["share_cents"] == 31000
-    assert admin_balance["remaining_cents"] == 11000  # Still owes 11000
+    assert admin_balance["remaining_cents"] == 11000
 
-    assert user_balance["total_paid_cents"] == 10000
-    assert user_balance["share_cents"] == 31000
-    assert user_balance["remaining_cents"] == 21000  # Still owes 21000
+    user_balance = next(b for b in data["member_balances"] if b["user_id"] == user.id)
+    assert user_balance["remaining_cents"] == 21000
 
 
 async def test_fund_overview_by_year(client: AsyncClient, admin_user):

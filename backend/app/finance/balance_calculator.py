@@ -12,12 +12,6 @@ async def calculate_fund_overview(
     db: AsyncSession,
     year: int | None = None,
 ) -> GardenFundOverview:
-    """Calculate the garden fund overview.
-
-    Costs = recurring (monthly*12 + yearly) + one-time expenses
-    Each member's share = total annual costs / number of active members
-    Each member's remaining = share - what they've paid
-    """
     if year is None:
         year = date.today().year
 
@@ -49,10 +43,14 @@ async def calculate_fund_overview(
         select(User).where(User.is_active.is_(True)).order_by(User.display_name)
     )
     members = list(members_result.scalars().all())
-    member_count = len(members) or 1  # Avoid division by zero
+    member_count = len(members) or 1
 
-    share_per_member_annual = total_costs_annual // member_count
-    share_per_member_monthly = share_per_member_annual // 12
+    # Getrennte Anteile
+    share_recurring_annual = total_recurring_annual // member_count
+    share_recurring_monthly = share_recurring_annual // 12
+    share_onetime = total_onetime // member_count
+    share_total_annual = total_costs_annual // member_count
+    share_total_monthly = share_total_annual // 12
 
     # ─── Payments this year per member ─────────────────────────
     payments_result = await db.execute(
@@ -69,14 +67,16 @@ async def calculate_fund_overview(
     member_balances = []
     for member in members:
         paid = payments_map.get(member.id, 0)
-        remaining = share_per_member_annual - paid
+        remaining = share_total_annual - paid
 
         member_balances.append(
             MemberBalance(
                 user_id=member.id,
                 display_name=member.display_name,
                 total_paid_cents=paid,
-                share_cents=share_per_member_annual,
+                share_recurring_cents=share_recurring_annual,
+                share_onetime_cents=share_onetime,
+                share_total_cents=share_total_annual,
                 remaining_cents=remaining,
             )
         )
@@ -91,8 +91,11 @@ async def calculate_fund_overview(
         total_costs_annual_cents=total_costs_annual,
         total_payments_cents=total_payments,
         fund_balance_cents=fund_balance,
-        share_per_member_annual_cents=share_per_member_annual,
-        share_per_member_monthly_cents=share_per_member_monthly,
+        share_recurring_per_member_annual_cents=share_recurring_annual,
+        share_recurring_per_member_monthly_cents=share_recurring_monthly,
+        share_onetime_per_member_cents=share_onetime,
+        share_total_per_member_annual_cents=share_total_annual,
+        share_total_per_member_monthly_cents=share_total_monthly,
         member_count=member_count,
         member_balances=member_balances,
     )
