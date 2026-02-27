@@ -84,7 +84,8 @@ async function loadAll() {
 // Helpers
 function timeAgo(dateStr: string): string {
   const now = new Date();
-  const date = new Date(dateStr);
+  // Server sends UTC – ensure we parse it as UTC
+  const date = new Date(dateStr.endsWith("Z") ? dateStr : dateStr + "Z");
   const diffMs = now.getTime() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return "gerade eben";
@@ -93,7 +94,7 @@ function timeAgo(dateStr: string): string {
   if (diffH < 24) return `vor ${diffH} Std`;
   const diffD = Math.floor(diffH / 24);
   if (diffD < 7) return `vor ${diffD} Tagen`;
-  return new Date(dateStr).toLocaleDateString("de-DE");
+  return date.toLocaleDateString("de-DE");
 }
 
 function senderName(msg: Message): string {
