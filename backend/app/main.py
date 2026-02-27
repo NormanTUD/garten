@@ -14,7 +14,6 @@ logger = logging.getLogger("gartenapp")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown logic."""
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
 
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
@@ -39,7 +38,6 @@ async def lifespan(app: FastAPI):
 
 
 def create_app(audit_session_factory=None) -> FastAPI:
-    """Application factory."""
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -77,11 +75,16 @@ def setup_middleware(app: FastAPI, audit_session_factory=None) -> None:
 
 
 def setup_routers(app: FastAPI) -> None:
-    """Register all API routers."""
     from app.audit.router import router as audit_router
     from app.auth.router import router as auth_router
     from app.auth.router import user_router
     from app.beds.router import planting_router, router as beds_router
+    from app.finance.router import (
+        balance_router,
+        category_router,
+        expense_router,
+        payment_router,
+    )
     from app.garden.router import router as garden_router
     from app.harvest.router import router as harvest_router
     from app.plants.router import router as plants_router
@@ -97,6 +100,10 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(harvest_router)
     app.include_router(watering_router)
     app.include_router(fertilizing_router)
+    app.include_router(category_router)
+    app.include_router(expense_router)
+    app.include_router(payment_router)
+    app.include_router(balance_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():
