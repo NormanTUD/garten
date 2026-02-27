@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.auth.schemas import UserCreate
@@ -16,6 +17,13 @@ test_engine = create_async_engine(
     TEST_DATABASE_URL,
     connect_args={"check_same_thread": False},
 )
+
+# Enable SQLite foreign keys for test DB
+@event.listens_for(test_engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 test_session_factory = async_sessionmaker(
     test_engine,
@@ -46,7 +54,6 @@ async def override_get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
-    """Async test client with overridden DB dependency and audit middleware."""
     app = create_app(audit_session_factory=test_session_factory)
     app.dependency_overrides[get_async_session] = override_get_async_session
 
@@ -57,7 +64,6 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
 @pytest.fixture
 async def admin_user():
-    """Create an admin user in the test DB and return (user, token)."""
     async with test_session_factory() as session:
         user = await create_user(
             session,
@@ -75,7 +81,6 @@ async def admin_user():
 
 @pytest.fixture
 async def normal_user():
-    """Create a normal user in the test DB and return (user, token)."""
     async with test_session_factory() as session:
         user = await create_user(
             session,
@@ -92,6 +97,4 @@ async def normal_user():
 
 
 def auth_header(token: str) -> dict[str, str]:
-    """Helper to create Authorization header."""
     return {"Authorization": f"Bearer {token}"}
-
