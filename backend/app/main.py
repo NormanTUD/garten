@@ -34,6 +34,18 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down %s", settings.app_name)
 
 
+def create_app(audit_session_factory=None) -> FastAPI:
+    app = FastAPI(
+        title=settings.app_name, version=settings.app_version,
+        docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json",
+        lifespan=lifespan,
+    )
+    setup_logging()
+    setup_middleware(app, audit_session_factory=audit_session_factory)
+    setup_routers(app)
+    return app
+
+
 def setup_logging() -> None:
     log_level = logging.DEBUG if settings.debug else logging.INFO
     logging.basicConfig(
@@ -63,12 +75,10 @@ def setup_routers(app: FastAPI) -> None:
     )
     from app.garden.router import router as garden_router
     from app.harvest.router import router as harvest_router
+    from app.messaging.router import message_router, rule_router
     from app.plants.router import router as plants_router
     from app.watering.router import fertilizing_router, watering_router
-    from app.messaging.router import message_router, rule_router
 
-    app.include_router(message_router)
-    app.include_router(rule_router)
     app.include_router(auth_router)
     app.include_router(user_router)
     app.include_router(audit_router)
@@ -86,6 +96,8 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(fund_router)
     app.include_router(receipt_router)
     app.include_router(standing_router)
+    app.include_router(message_router)
+    app.include_router(rule_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():
