@@ -1,13 +1,14 @@
 import json
 import logging
 import time
+from collections.abc import Callable
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.auth.utils import TOKEN_TYPE_ACCESS, decode_token
-from app.database import async_session_factory
 
 logger = logging.getLogger("gartenapp.audit")
 
@@ -65,7 +66,50 @@ def extract_user_from_token(authorization: str | None) -> tuple[int | None, str 
         return None, None
 
 
+async def _write_audit_log(
+    session_factory: Callable[..., AsyncSession] | async_sessionmaker,
+    *,
+    user_id: int | None,
+    username: str | None,
+    method: str,
+    endpoint: str,
+    request_body: str | None,
+    response_status: int,
+    ip_address: str | None,
+    user_agent: str | None,
+    duration_ms: int | None,
+) -> None:
+    """Write audit log entry using the provided session factory."""
+    from app.audit.models import AuditLog
+
+    async with session_factory() as session:
+        log = AuditLog(
+            user_id=user_id,
+            username=username,
+            method=method,
+            endpoint=endpoint,
+            request_body=request_body,
+            response_status=response_status,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            duration_ms=duration_ms,
+        )
+        session.add(log)
+        await session.commit()
+
+
 class AuditLogMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, session_factory: async_sessionmaker | None = None):
+        super().__init__(app)
+        self._session_factory = session_factory
+
+    @property
+    def session_factory(self) -> async_sessionmaker:
+        if self._session_factory is not None:
+            return self._session_factory
+        from app.database import async_session_factory
+        return async_session_factory
+
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Skip non-API and noisy endpoints
         path = request.url.path
@@ -88,7 +132,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         except Exception:
             request_body_str = "(unreadable body)"
 
-        # Extract user info from token (best-effort, before request processing)
+        # Extract user info from token (best-effort)
         user_id, username = extract_user_from_token(
             request.headers.get("authorization")
         )
@@ -98,23 +142,20 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
 
         duration_ms = int((time.monotonic() - start_time) * 1000)
 
-        # Write audit log asynchronously (separate session, won't affect request)
+        # Write audit log
         try:
-            from app.audit.service import create_audit_log
-
-            async with async_session_factory() as session:
-                await create_audit_log(
-                    session,
-                    user_id=user_id,
-                    username=username,
-                    method=request.method,
-                    endpoint=path,
-                    request_body=request_body_str,
-                    response_status=response.status_code,
-                    ip_address=request.client.host if request.client else None,
-                    user_agent=request.headers.get("user-agent", "")[:500],
-                    duration_ms=duration_ms,
-                )
+            await _write_audit_log(
+                self.session_factory,
+                user_id=user_id,
+                username=username,
+                method=request.method,
+                endpoint=path,
+                request_body=request_body_str,
+                response_status=response.status_code,
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent", "")[:500],
+                duration_ms=duration_ms,
+            )
         except Exception:
             logger.exception("Failed to write audit log for %s %s", request.method, path)
 

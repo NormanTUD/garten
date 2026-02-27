@@ -46,8 +46,8 @@ async def override_get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
-    """Async test client with overridden DB dependency."""
-    app = create_app()
+    """Async test client with overridden DB dependency and audit middleware."""
+    app = create_app(audit_session_factory=test_session_factory)
     app.dependency_overrides[get_async_session] = override_get_async_session
 
     transport = ASGITransport(app=app)
