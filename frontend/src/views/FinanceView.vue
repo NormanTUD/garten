@@ -15,15 +15,17 @@ interface Category {
   is_active: boolean;
 }
 
-interface Split {
+interface RecurringCost {
   id: number;
-  user_id: number;
-  user: { id: number; display_name: string };
-  share_amount_cents: number;
-  is_settled: boolean;
+  category: { id: number; name: string; icon: string | null } | null;
+  description: string;
+  amount_cents: number;
+  interval: string;
+  is_active: boolean;
+  notes: string | null;
 }
 
-interface Expense {
+interface GardenExpense {
   id: number;
   user: { id: number; display_name: string };
   category: { id: number; name: string; icon: string | null } | null;
@@ -32,37 +34,40 @@ interface Expense {
   expense_date: string;
   receipt_image_path: string | null;
   notes: string | null;
-  splits: Split[];
 }
 
-interface Payment {
+interface MemberPayment {
   id: number;
-  from_user: { id: number; display_name: string };
-  to_user: { id: number; display_name: string };
+  user: { id: number; display_name: string };
   amount_cents: number;
-  method: string;
+  payment_type: string;
   description: string | null;
   payment_date: string;
+  receipt_image_path: string | null;
   confirmed_by_admin: boolean;
+  notes: string | null;
 }
 
-interface UserBalance {
+interface MemberBalance {
   user_id: number;
   display_name: string;
   total_paid_cents: number;
-  total_share_cents: number;
-  balance_cents: number;
+  share_cents: number;
+  remaining_cents: number;
 }
 
-interface BalanceOverview {
-  balances: UserBalance[];
-  total_expenses_cents: number;
-}
-
-interface UserInfo {
-  id: number;
-  username: string;
-  display_name: string;
+interface FundOverview {
+  total_recurring_monthly_cents: number;
+  total_recurring_yearly_cents: number;
+  total_recurring_annual_cents: number;
+  total_onetime_expenses_cents: number;
+  total_costs_annual_cents: number;
+  total_payments_cents: number;
+  fund_balance_cents: number;
+  share_per_member_annual_cents: number;
+  share_per_member_monthly_cents: number;
+  member_count: number;
+  member_balances: MemberBalance[];
 }
 
 // ─── State ────────────────────────────────────────────────────────
@@ -71,41 +76,51 @@ const tab = ref("expenses");
 const loading = ref(true);
 
 const categories = ref<Category[]>([]);
-const expenses = ref<Expense[]>([]);
-const payments = ref<Payment[]>([]);
-const balance = ref<BalanceOverview | null>(null);
-const users = ref<UserInfo[]>([]);
+const recurring = ref<RecurringCost[]>([]);
+const expenses = ref<GardenExpense[]>([]);
+const payments = ref<MemberPayment[]>([]);
+const fund = ref<FundOverview | null>(null);
 
-// Expense form
+// Expense quick-entry
 const showExpenseDialog = ref(false);
 const expenseForm = ref({
   amount: null as number | null,
   description: "",
-  category_id: null as number | null,
+  category_name: "",
   expense_date: new Date().toISOString().split("T")[0],
   receipt_image_path: null as string | null,
   notes: "",
 });
 
-// Payment form
+// Payment quick-entry
 const showPaymentDialog = ref(false);
 const paymentForm = ref({
-  to_user_id: null as number | null,
   amount: null as number | null,
-  method: "cash",
+  payment_type: "cash",
   description: "",
   payment_date: new Date().toISOString().split("T")[0],
+  receipt_image_path: null as string | null,
 });
 
-// Category form
-const showCategoryDialog = ref(false);
-const categoryForm = ref({ name: "", icon: "" });
+// Recurring cost form (admin)
+const showRecurringDialog = ref(false);
+const recurringForm = ref({
+  description: "",
+  amount: null as number | null,
+  interval: "monthly",
+  notes: "",
+});
 
 // ─── Computed ─────────────────────────────────────────────────────
 
-const otherUsers = computed(() =>
-  users.value.filter((u) => u.id !== auth.user?.id)
+const categoryNames = computed(() =>
+  categories.value.filter((c) => c.is_active).map((c) => (c.icon ? c.icon + " " : "") + c.name)
 );
+
+const myBalance = computed(() => {
+  if (!fund.value || !auth.user) return null;
+  return fund.value.member_balances.find((b) => b.user_id === auth.user!.id) || null;
+});
 
 // ─── Load Data ────────────────────────────────────────────────────
 
@@ -114,26 +129,18 @@ onMounted(() => loadAll());
 async function loadAll() {
   loading.value = true;
   try {
-    const [cats, exps, pays, bal, usrs] = await Promise.all([
+    const [cats, rec, exps, pays, f] = await Promise.all([
       api.get<Category[]>("/finance/categories/"),
-      api.get<Expense[]>("/finance/expenses/"),
-      api.get<Payment[]>("/finance/payments/"),
-      api.get<BalanceOverview>("/finance/balance/"),
-      auth.isAdmin ? api.get<UserInfo[]>("/users/") : Promise.resolve([]),
+      api.get<RecurringCost[]>("/finance/recurring/"),
+      api.get<GardenExpense[]>("/finance/expenses/"),
+      api.get<MemberPayment[]>("/finance/payments/"),
+      api.get<FundOverview>("/finance/fund/"),
     ]);
     categories.value = cats;
+    recurring.value = rec;
     expenses.value = exps;
     payments.value = pays;
-    balance.value = bal;
-    if (usrs.length) users.value = usrs;
-    else {
-      // Non-admin: extract users from balance
-      users.value = bal.balances.map((b) => ({
-        id: b.user_id,
-        username: "",
-        display_name: b.display_name,
-      }));
-    }
+    fund.value = f;
   } finally {
     loading.value = false;
   }
@@ -141,26 +148,28 @@ async function loadAll() {
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
-function formatEuro(cents: number): string {
-  return (cents / 100).toLocaleString("de-DE", {
-    style: "currency",
-    currency: "EUR",
-  });
+function eur(cents: number): string {
+  return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 }
 
-function balanceColor(cents: number): string {
-  if (cents > 0) return "success";
-  if (cents < 0) return "error";
+function balanceColor(remaining: number): string {
+  if (remaining > 0) return "error";
+  if (remaining < 0) return "success";
   return "default";
 }
 
-function methodLabel(method: string): string {
-  const map: Record<string, string> = {
-    cash: "Bar",
-    transfer: "Überweisung",
-    material: "Sachleistung",
-  };
-  return map[method] || method;
+function balanceText(remaining: number): string {
+  if (remaining > 0) return "schuldet noch";
+  if (remaining < 0) return "hat überzahlt";
+  return "ausgeglichen ✓";
+}
+
+function paymentTypeLabel(t: string): string {
+  return { cash: "💵 Bar", transfer: "🏦 Überweisung", material: "🛒 Sachleistung" }[t] || t;
+}
+
+function intervalLabel(i: string): string {
+  return { monthly: "monatlich", yearly: "jährlich" }[i] || i;
 }
 
 // ─── Expense Actions ──────────────────────────────────────────────
@@ -169,7 +178,7 @@ function openExpenseDialog() {
   expenseForm.value = {
     amount: null,
     description: "",
-    category_id: null,
+    category_name: "",
     expense_date: new Date().toISOString().split("T")[0],
     receipt_image_path: null,
     notes: "",
@@ -178,14 +187,31 @@ function openExpenseDialog() {
 }
 
 async function saveExpense() {
-  if (!expenseForm.value.amount) return;
+  if (!expenseForm.value.amount || !expenseForm.value.description) return;
+
   const data: any = {
     amount_cents: Math.round(expenseForm.value.amount * 100),
     description: expenseForm.value.description,
     expense_date: expenseForm.value.expense_date,
   };
-  if (expenseForm.value.category_id) data.category_id = expenseForm.value.category_id;
-  if (expenseForm.value.receipt_image_path) data.receipt_image_path = expenseForm.value.receipt_image_path;
+
+  // Dynamic category: strip emoji prefix if present
+  if (expenseForm.value.category_name) {
+    const raw = expenseForm.value.category_name.trim();
+    // Check if it matches an existing category (with emoji prefix)
+    const existing = categories.value.find(
+      (c) => (c.icon ? c.icon + " " : "") + c.name === raw
+    );
+    if (existing) {
+      data.category_id = existing.id;
+    } else {
+      data.category_name = raw;
+    }
+  }
+
+  if (expenseForm.value.receipt_image_path) {
+    data.receipt_image_path = expenseForm.value.receipt_image_path;
+  }
   if (expenseForm.value.notes) data.notes = expenseForm.value.notes;
 
   await api.post("/finance/expenses/", data);
@@ -198,42 +224,35 @@ async function deleteExpense(id: number) {
   await loadAll();
 }
 
-async function toggleSettle(expense: Expense, split: Split) {
-  if (split.is_settled) {
-    await api.patch(`/finance/expenses/${expense.id}/splits/${split.id}/unsettle`);
-  } else {
-    await api.patch(`/finance/expenses/${expense.id}/splits/${split.id}/settle`);
-  }
-  await loadAll();
-}
-
 // ─── Payment Actions ──────────────────────────────────────────────
 
 function openPaymentDialog() {
   paymentForm.value = {
-    to_user_id: null,
     amount: null,
-    method: "cash",
+    payment_type: "cash",
     description: "",
     payment_date: new Date().toISOString().split("T")[0],
+    receipt_image_path: null,
   };
   showPaymentDialog.value = true;
 }
 
 async function savePayment() {
-  if (!paymentForm.value.amount || !paymentForm.value.to_user_id) return;
+  if (!paymentForm.value.amount) return;
+
   const data: any = {
-    to_user_id: paymentForm.value.to_user_id,
     amount_cents: Math.round(paymentForm.value.amount * 100),
-    method: paymentForm.value.method,
+    payment_type: paymentForm.value.payment_type,
     payment_date: paymentForm.value.payment_date,
   };
   if (paymentForm.value.description) data.description = paymentForm.value.description;
+  if (paymentForm.value.receipt_image_path) data.receipt_image_path = paymentForm.value.receipt_image_path;
 
   await api.post("/finance/payments/", data);
   showPaymentDialog.value = false;
   await loadAll();
 }
+
 async function confirmPayment(id: number) {
   await api.patch(`/finance/payments/${id}`, { confirmed_by_admin: true });
   await loadAll();
@@ -244,265 +263,312 @@ async function deletePayment(id: number) {
   await loadAll();
 }
 
-// ─── Category Actions ─────────────────────────────────────────────
+// ─── Recurring Cost Actions ───────────────────────────────────────
 
-function openCategoryDialog() {
-  categoryForm.value = { name: "", icon: "" };
-  showCategoryDialog.value = true;
+function openRecurringDialog() {
+  recurringForm.value = { description: "", amount: null, interval: "monthly", notes: "" };
+  showRecurringDialog.value = true;
 }
 
-async function saveCategory() {
-  if (!categoryForm.value.name) return;
-  const data: any = { name: categoryForm.value.name };
-  if (categoryForm.value.icon) data.icon = categoryForm.value.icon;
-  await api.post("/finance/categories/", data);
-  showCategoryDialog.value = false;
+async function saveRecurring() {
+  if (!recurringForm.value.amount || !recurringForm.value.description) return;
+  await api.post("/finance/recurring/", {
+    description: recurringForm.value.description,
+    amount_cents: Math.round(recurringForm.value.amount * 100),
+    interval: recurringForm.value.interval,
+    notes: recurringForm.value.notes || undefined,
+  });
+  showRecurringDialog.value = false;
   await loadAll();
 }
 
-// ─── Receipt photo attached to expense form ───────────────────────
-
-function onReceiptUploaded(data: { path: string; filename: string }) {
-  expenseForm.value.receipt_image_path = data.path;
+async function deleteRecurring(id: number) {
+  await api.delete(`/finance/recurring/${id}`);
+  await loadAll();
 }
 </script>
 
 <template>
   <div>
-    <h1 class="text-h4 mb-4">Finanzen</h1>
+    <h1 class="text-h4 mb-2">Gartenkasse</h1>
 
-    <!-- ─── Balance Overview (always visible) ──────────────────── -->
-    <v-card class="mb-6" v-if="balance">
-      <v-card-title class="d-flex align-center">
-        <v-icon icon="mdi-scale-balance" class="mr-2" />
-        Kontostand
-        <v-spacer />
-        <v-chip variant="tonal">
-          Gesamt: {{ formatEuro(balance.total_expenses_cents) }}
-        </v-chip>
-      </v-card-title>
-      <v-card-text>
-        <v-row>
-          <v-col
-            v-for="b in balance.balances"
+    <v-skeleton-loader v-if="loading" type="card@2" />
+
+    <template v-else>
+      <!-- ═══ My Balance (prominent) ═══════════════════════════ -->
+      <v-card
+        v-if="myBalance"
+        :color="balanceColor(myBalance.remaining_cents)"
+        variant="tonal"
+        class="mb-4"
+      >
+        <v-card-text class="text-center pa-4">
+          <div class="text-body-1">Dein Stand</div>
+          <div class="text-h3 font-weight-bold my-2">
+            {{ eur(Math.abs(myBalance.remaining_cents)) }}
+          </div>
+          <div class="text-body-1">
+            {{ balanceText(myBalance.remaining_cents) }}
+          </div>
+          <div class="text-caption mt-1">
+            Soll: {{ eur(myBalance.share_cents) }} · Bezahlt: {{ eur(myBalance.total_paid_cents) }}
+          </div>
+        </v-card-text>
+      </v-card>
+
+      <!-- ═══ Fund Summary ═════════════════════════════════════ -->
+      <v-card class="mb-4" v-if="fund">
+        <v-card-text>
+          <v-row dense>
+            <v-col cols="6" sm="3">
+              <div class="text-caption text-medium-emphasis">Jahreskosten</div>
+              <div class="text-h6 font-weight-bold">{{ eur(fund.total_costs_annual_cents) }}</div>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <div class="text-caption text-medium-emphasis">Pro Person/Monat</div>
+              <div class="text-h6 font-weight-bold">{{ eur(fund.share_per_member_monthly_cents) }}</div>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <div class="text-caption text-medium-emphasis">Eingezahlt gesamt</div>
+              <div class="text-h6 font-weight-bold text-success">{{ eur(fund.total_payments_cents) }}</div>
+            </v-col>
+            <v-col cols="6" sm="3">
+              <div class="text-caption text-medium-emphasis">Kassenstand</div>
+              <div class="text-h6 font-weight-bold" :class="fund.fund_balance_cents >= 0 ? 'text-success' : 'text-error'">
+                {{ eur(fund.fund_balance_cents) }}
+              </div>
+            </v-col>
+          </v-row>
+        </v-card-text>
+
+        <!-- All members -->
+        <v-divider />
+        <v-card-text class="pt-2 pb-3">
+          <div class="text-caption text-medium-emphasis mb-2">Alle Mitglieder ({{ fund.member_count }})</div>
+          <v-chip
+            v-for="b in fund.member_balances"
             :key="b.user_id"
-            cols="6"
-            sm="4"
-            md="3"
+            :color="balanceColor(b.remaining_cents)"
+            variant="tonal"
+            class="mr-2 mb-1"
+            size="small"
           >
-            <v-card :color="balanceColor(b.balance_cents)" variant="tonal">
-              <v-card-text class="text-center pa-3">
-                <div class="text-body-2 font-weight-bold">{{ b.display_name }}</div>
-                <div class="text-h5 font-weight-bold mt-1">
-                  {{ formatEuro(b.balance_cents) }}
+            {{ b.display_name }}:
+            <strong class="ml-1">{{ b.remaining_cents > 0 ? '-' : '+' }}{{ eur(Math.abs(b.remaining_cents)) }}</strong>
+          </v-chip>
+        </v-card-text>
+      </v-card>
+
+      <!-- ═══ Quick Action Buttons ═════════════════════════════ -->
+      <div class="d-flex ga-2 mb-4 flex-wrap">
+        <v-btn color="primary" size="large" prepend-icon="mdi-plus" @click="openExpenseDialog">
+          Ausgabe
+        </v-btn>
+        <v-btn color="success" size="large" variant="tonal" prepend-icon="mdi-cash-plus" @click="openPaymentDialog">
+          Einzahlung
+        </v-btn>
+        <v-btn
+          v-if="auth.isAdmin"
+          color="default"
+          variant="outlined"
+          size="small"
+          prepend-icon="mdi-repeat"
+          @click="openRecurringDialog"
+        >
+          Laufende Kosten
+        </v-btn>
+      </div>
+
+      <!-- ═══ Tabs ═════════════════════════════════════════════ -->
+      <v-tabs v-model="tab" color="primary" class="mb-4">
+        <v-tab value="expenses">
+          <v-icon start icon="mdi-receipt" />
+          Ausgaben ({{ expenses.length }})
+        </v-tab>
+        <v-tab value="payments">
+          <v-icon start icon="mdi-cash-multiple" />
+          Einzahlungen ({{ payments.length }})
+        </v-tab>
+        <v-tab value="recurring">
+          <v-icon start icon="mdi-repeat" />
+          Laufend ({{ recurring.length }})
+        </v-tab>
+      </v-tabs>
+
+      <v-window v-model="tab">
+        <!-- ─── Expenses Tab ─────────────────────────────────── -->
+        <v-window-item value="expenses">
+          <div v-if="expenses.length === 0" class="text-center py-8">
+            <v-icon icon="mdi-receipt-text-outline" size="64" color="grey" />
+            <p class="text-body-1 text-grey mt-2">Noch keine Ausgaben</p>
+          </div>
+
+          <v-list v-else lines="three">
+            <v-list-item v-for="e in expenses" :key="e.id">
+              <template #prepend>
+                <v-avatar
+                  v-if="e.receipt_image_path"
+                  rounded="lg"
+                  size="48"
+                >
+                  <v-img :src="`/api/finance/receipts/${e.receipt_image_path.replace('receipts/', '')}`" cover />
+                </v-avatar>
+                <v-avatar v-else color="primary" variant="tonal" size="48">
+                  <v-icon icon="mdi-receipt" />
+                </v-avatar>
+              </template>
+
+              <template #title>
+                <span class="font-weight-bold">{{ e.description }}</span>
+                <v-chip v-if="e.category" size="x-small" class="ml-2" variant="tonal">
+                  {{ e.category.icon || "" }} {{ e.category.name }}
+                </v-chip>
+              </template>
+
+              <template #subtitle>
+                {{ new Date(e.expense_date).toLocaleDateString("de-DE") }}
+                · {{ e.user.display_name }}
+                <span v-if="e.notes"> · {{ e.notes }}</span>
+              </template>
+
+              <template #append>
+                <div class="text-right">
+                  <div class="text-body-1 font-weight-bold text-primary">{{ eur(e.amount_cents) }}</div>
+                  <v-btn size="x-small" icon="mdi-delete" variant="text" color="error" @click="deleteExpense(e.id)" />
                 </div>
-                <div class="text-caption">
-                  {{ b.balance_cents > 0 ? "bekommt noch" : b.balance_cents < 0 ? "schuldet noch" : "ausgeglichen" }}
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-window-item>
+
+        <!-- ─── Payments Tab ─────────────────────────────────── -->
+        <v-window-item value="payments">
+          <div v-if="payments.length === 0" class="text-center py-8">
+            <v-icon icon="mdi-cash-remove" size="64" color="grey" />
+            <p class="text-body-1 text-grey mt-2">Noch keine Einzahlungen</p>
+          </div>
+
+          <v-list v-else lines="three">
+            <v-list-item v-for="p in payments" :key="p.id">
+              <template #prepend>
+                <v-avatar
+                  v-if="p.receipt_image_path"
+                  rounded="lg"
+                  size="48"
+                >
+                  <v-img :src="`/api/finance/receipts/${p.receipt_image_path.replace('receipts/', '')}`" cover />
+                </v-avatar>
+                <v-avatar v-else color="success" variant="tonal" size="48">
+                  <v-icon icon="mdi-cash-plus" />
+                </v-avatar>
+              </template>
+
+              <template #title>
+                <span class="font-weight-bold">{{ p.user.display_name }}</span>
+                <v-chip size="x-small" class="ml-2" variant="tonal">
+                  {{ paymentTypeLabel(p.payment_type) }}
+                </v-chip>
+                <v-chip
+                  v-if="p.confirmed_by_admin"
+                  size="x-small"
+                  color="success"
+                  variant="flat"
+                  class="ml-1"
+                >
+                  ✓ Bestätigt
+                </v-chip>
+              </template>
+
+              <template #subtitle>
+                {{ new Date(p.payment_date).toLocaleDateString("de-DE") }}
+                <span v-if="p.description"> · {{ p.description }}</span>
+              </template>
+
+              <template #append>
+                <div class="text-right">
+                  <div class="text-body-1 font-weight-bold text-success">{{ eur(p.amount_cents) }}</div>
+                  <div class="d-flex ga-1 justify-end mt-1">
+                    <v-btn
+                      v-if="auth.isAdmin && !p.confirmed_by_admin"
+                      size="x-small"
+                      color="success"
+                      variant="tonal"
+                      @click="confirmPayment(p.id)"
+                    >
+                      Bestätigen
+                    </v-btn>
+                    <v-btn size="x-small" icon="mdi-delete" variant="text" color="error" @click="deletePayment(p.id)" />
+                  </div>
                 </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-card-text>
-    </v-card>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-window-item>
 
-    <!-- ─── Action Buttons ─────────────────────────────────────── -->
-    <div class="d-flex ga-2 mb-4 flex-wrap">
-      <v-btn color="primary" prepend-icon="mdi-plus" size="large" @click="openExpenseDialog">
-        Ausgabe erfassen
-      </v-btn>
-      <v-btn color="secondary" prepend-icon="mdi-cash" variant="tonal" @click="openPaymentDialog">
-        Zahlung erfassen
-      </v-btn>
-      <v-btn color="default" prepend-icon="mdi-tag-plus" variant="outlined" size="small" @click="openCategoryDialog">
-        Kategorie
-      </v-btn>
-    </div>
-
-    <!-- ─── Tabs ───────────────────────────────────────────────── -->
-    <v-tabs v-model="tab" color="primary" class="mb-4">
-      <v-tab value="expenses">
-        <v-icon start icon="mdi-receipt" />
-        Ausgaben ({{ expenses.length }})
-      </v-tab>
-      <v-tab value="payments">
-        <v-icon start icon="mdi-cash-multiple" />
-        Zahlungen ({{ payments.length }})
-      </v-tab>
-    </v-tabs>
-
-    <v-skeleton-loader v-if="loading" type="card@3" />
-
-    <!-- ─── Expenses Tab ───────────────────────────────────────── -->
-    <v-window v-model="tab">
-      <v-window-item value="expenses">
-        <div v-if="expenses.length === 0" class="text-center py-12">
-          <v-icon icon="mdi-receipt-text-outline" size="80" color="grey" />
-          <p class="text-h6 text-grey mt-4">Noch keine Ausgaben erfasst</p>
-        </div>
-
-        <v-card v-for="expense in expenses" :key="expense.id" class="mb-3">
-          <v-card-title class="d-flex align-center">
-            <v-chip
-              v-if="expense.category"
-              size="small"
+        <!-- ─── Recurring Costs Tab ──────────────────────────── -->
+        <v-window-item value="recurring">
+          <div v-if="recurring.length === 0" class="text-center py-8">
+            <v-icon icon="mdi-repeat-off" size="64" color="grey" />
+            <p class="text-body-1 text-grey mt-2">Keine laufenden Kosten eingetragen</p>
+            <v-btn
+              v-if="auth.isAdmin"
               color="primary"
               variant="tonal"
-              class="mr-2"
+              class="mt-2"
+              @click="openRecurringDialog"
             >
-              {{ expense.category.icon || "📁" }} {{ expense.category.name }}
-            </v-chip>
-            <span class="font-weight-bold">{{ expense.description }}</span>
-            <v-spacer />
-            <span class="text-h6 font-weight-bold text-primary">
-              {{ formatEuro(expense.amount_cents) }}
-            </span>
-          </v-card-title>
+              Erste laufende Kosten anlegen
+            </v-btn>
+          </div>
 
-          <v-card-subtitle class="d-flex align-center ga-2">
-            <v-icon icon="mdi-account" size="small" />
-            {{ expense.user.display_name }}
-            <v-icon icon="mdi-calendar" size="small" class="ml-2" />
-            {{ new Date(expense.expense_date).toLocaleDateString("de-DE") }}
-            <v-icon
-              v-if="expense.receipt_image_path"
-              icon="mdi-camera"
-              size="small"
-              color="primary"
-              class="ml-2"
-            />
-          </v-card-subtitle>
+          <v-list v-else>
+            <v-list-item v-for="r in recurring" :key="r.id">
+              <template #prepend>
+                <v-avatar color="warning" variant="tonal">
+                  <v-icon icon="mdi-repeat" />
+                </v-avatar>
+              </template>
 
-          <v-card-text v-if="expense.notes" class="text-body-2 pt-1 pb-0">
-            {{ expense.notes }}
-          </v-card-text>
+              <template #title>
+                <span class="font-weight-bold">{{ r.description }}</span>
+              </template>
 
-          <!-- Receipt preview -->
-          <v-card-text v-if="expense.receipt_image_path" class="pt-2 pb-0">
-            <v-img
-              :src="`/api/finance/receipts/${expense.receipt_image_path.replace('receipts/', '')}`"
-              max-height="120"
-              max-width="200"
-              rounded="lg"
-              cover
-            />
-          </v-card-text>
+              <template #subtitle>
+                {{ intervalLabel(r.interval) }}
+                <span v-if="r.notes"> · {{ r.notes }}</span>
+              </template>
 
-          <!-- Splits -->
-          <v-card-text class="pt-2">
-            <div class="text-caption text-medium-emphasis mb-1">Aufteilung:</div>
-            <v-chip
-              v-for="split in expense.splits"
-              :key="split.id"
-              size="small"
-              :color="split.is_settled ? 'success' : 'default'"
-              :variant="split.is_settled ? 'flat' : 'outlined'"
-              class="mr-1 mb-1"
-              @click="toggleSettle(expense, split)"
-              style="cursor: pointer"
-            >
-              <v-icon
-                start
-                :icon="split.is_settled ? 'mdi-check-circle' : 'mdi-circle-outline'"
-                size="small"
-              />
-              {{ split.user.display_name }}: {{ formatEuro(split.share_amount_cents) }}
-            </v-chip>
-          </v-card-text>
+              <template #append>
+                <div class="text-right">
+                  <div class="text-body-1 font-weight-bold">{{ eur(r.amount_cents) }}</div>
+                  <div class="text-caption text-medium-emphasis">
+                    {{ r.interval === "monthly" ? eur(r.amount_cents * 12) + "/Jahr" : eur(r.amount_cents) + "/Jahr" }}
+                  </div>
+                  <v-btn
+                    v-if="auth.isAdmin"
+                    size="x-small"
+                    icon="mdi-delete"
+                    variant="text"
+                    color="error"
+                    @click="deleteRecurring(r.id)"
+                  />
+                </div>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-window-item>
+      </v-window>
+    </template>
 
-          <v-card-actions>
-            <v-spacer />
-            <v-btn
-              size="small"
-              color="error"
-              variant="text"
-              icon="mdi-delete"
-              @click="deleteExpense(expense.id)"
-            />
-          </v-card-actions>
-        </v-card>
-      </v-window-item>
-
-      <!-- ─── Payments Tab ───────────────────────────────────── -->
-      <v-window-item value="payments">
-        <div v-if="payments.length === 0" class="text-center py-12">
-          <v-icon icon="mdi-cash-remove" size="80" color="grey" />
-          <p class="text-h6 text-grey mt-4">Noch keine Zahlungen erfasst</p>
-        </div>
-
-        <v-card v-for="payment in payments" :key="payment.id" class="mb-3">
-          <v-list-item>
-            <template #prepend>
-              <v-avatar color="info" variant="tonal">
-                <v-icon icon="mdi-cash" />
-              </v-avatar>
-            </template>
-
-            <template #title>
-              <span class="font-weight-bold">
-                {{ payment.from_user.display_name }}
-              </span>
-              →
-              <span class="font-weight-bold">
-                {{ payment.to_user.display_name }}
-              </span>
-              <span class="text-primary font-weight-bold ml-2">
-                {{ formatEuro(payment.amount_cents) }}
-              </span>
-            </template>
-
-            <template #subtitle>
-              {{ new Date(payment.payment_date).toLocaleDateString("de-DE") }}
-              · {{ methodLabel(payment.method) }}
-              <span v-if="payment.description"> · {{ payment.description }}</span>
-            </template>
-
-            <template #append>
-              <v-chip
-                v-if="payment.confirmed_by_admin"
-                size="small"
-                color="success"
-                variant="flat"
-              >
-                <v-icon start icon="mdi-check" size="small" />
-                Bestätigt
-              </v-chip>
-              <v-btn
-                v-else-if="auth.isAdmin"
-                size="small"
-                color="success"
-                variant="tonal"
-                @click="confirmPayment(payment.id)"
-              >
-                Bestätigen
-              </v-btn>
-              <v-chip v-else size="small" color="warning" variant="tonal">
-                Offen
-              </v-chip>
-              <v-btn
-                size="small"
-                color="error"
-                variant="text"
-                icon="mdi-delete"
-                class="ml-1"
-                @click="deletePayment(payment.id)"
-              />
-            </template>
-          </v-list-item>
-        </v-card>
-      </v-window-item>
-    </v-window>
-
-    <!-- ═══ Expense Dialog ═══════════════════════════════════════ -->
-    <v-dialog v-model="showExpenseDialog" max-width="500">
+    <!-- ═══ Expense Dialog (Quick Entry) ═══════════════════════ -->
+    <v-dialog v-model="showExpenseDialog" max-width="500" eager>
       <v-card>
-        <v-card-title>
+        <v-card-title class="d-flex align-center">
           <v-icon icon="mdi-receipt" class="mr-2" />
           Ausgabe erfassen
         </v-card-title>
         <v-card-text>
           <v-form @submit.prevent="saveExpense">
-            <!-- Amount: BIG input, autofocus -->
             <v-text-field
               v-model.number="expenseForm.amount"
               label="Betrag (€) *"
@@ -511,52 +577,57 @@ function onReceiptUploaded(data: { path: string; filename: string }) {
               step="0.01"
               prefix="€"
               autofocus
-              class="mb-2 text-h5"
               inputmode="decimal"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3 text-h5"
             />
 
             <v-text-field
               v-model="expenseForm.description"
-              label="Beschreibung *"
+              label="Wofür? *"
               placeholder="z.B. Baumarkt Erde 20L"
-              class="mb-2"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
             />
 
-            <v-select
-              v-model="expenseForm.category_id"
+            <v-combobox
+              v-model="expenseForm.category_name"
               label="Kategorie"
-              :items="categories.filter(c => c.is_active)"
-              :item-title="(c: Category) => (c.icon ? c.icon + ' ' : '') + c.name"
-              item-value="id"
+              :items="categoryNames"
+              placeholder="Tippen oder wählen..."
               clearable
-              class="mb-2"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
+              hint="Neue Kategorie? Einfach eintippen!"
+              persistent-hint
             />
 
             <v-text-field
               v-model="expenseForm.expense_date"
               label="Datum"
               type="date"
-              class="mb-2"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
             />
 
-            <!-- Receipt Photo -->
             <div class="text-body-2 text-medium-emphasis mb-1">Kassenbon / Rechnung:</div>
             <PhotoCapture
               v-model="expenseForm.receipt_image_path"
               label="Beleg fotografieren"
-              @uploaded="onReceiptUploaded"
             />
 
             <v-textarea
               v-model="expenseForm.notes"
               label="Notizen"
               rows="2"
-              class="mt-2"
+              variant="outlined"
+              density="comfortable"
+              class="mt-3"
             />
-
-            <v-alert type="info" variant="tonal" density="compact" class="mt-2">
-              Wird automatisch gleichmäßig auf alle Mitglieder aufgeteilt.
-            </v-alert>
           </v-form>
         </v-card-text>
         <v-card-actions>
@@ -575,24 +646,15 @@ function onReceiptUploaded(data: { path: string; filename: string }) {
       </v-card>
     </v-dialog>
 
-    <!-- ═══ Payment Dialog ═══════════════════════════════════════ -->
-    <v-dialog v-model="showPaymentDialog" max-width="500">
+    <!-- ═══ Payment Dialog (Quick Entry) ═══════════════════════ -->
+    <v-dialog v-model="showPaymentDialog" max-width="500" eager>
       <v-card>
-        <v-card-title>
-          <v-icon icon="mdi-cash" class="mr-2" />
-          Zahlung erfassen
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-cash-plus" class="mr-2" color="success" />
+          Einzahlung in die Gartenkasse
         </v-card-title>
         <v-card-text>
           <v-form @submit.prevent="savePayment">
-            <v-select
-              v-model="paymentForm.to_user_id"
-              label="Zahlung an *"
-              :items="otherUsers"
-              item-title="display_name"
-              item-value="id"
-              class="mb-2"
-            />
-
             <v-text-field
               v-model.number="paymentForm.amount"
               label="Betrag (€) *"
@@ -600,71 +662,137 @@ function onReceiptUploaded(data: { path: string; filename: string }) {
               min="0.01"
               step="0.01"
               prefix="€"
+              autofocus
               inputmode="decimal"
-              class="mb-2"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3 text-h5"
             />
 
-            <v-radio-group v-model="paymentForm.method" inline label="Methode" class="mb-2">
-              <v-radio label="Bar" value="cash" />
-              <v-radio label="Überweisung" value="transfer" />
-              <v-radio label="Sachleistung" value="material" />
-            </v-radio-group>
+            <v-btn-toggle
+              v-model="paymentForm.payment_type"
+              mandatory
+              color="primary"
+              class="mb-3"
+              density="comfortable"
+            >
+              <v-btn value="cash">💵 Bar</v-btn>
+              <v-btn value="transfer">🏦 Überweisung</v-btn>
+              <v-btn value="material">🛒 Sachleistung</v-btn>
+            </v-btn-toggle>
 
             <v-text-field
               v-model="paymentForm.payment_date"
               label="Datum"
               type="date"
-              class="mb-2"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
             />
 
             <v-text-field
               v-model="paymentForm.description"
               label="Beschreibung"
-              placeholder="z.B. Ausgleich April"
+              :placeholder="paymentForm.payment_type === 'material' ? 'z.B. Erde mitgebracht' : 'optional'"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
             />
+
+            <template v-if="paymentForm.payment_type === 'material'">
+              <div class="text-body-2 text-medium-emphasis mb-1">Beleg / Rechnung:</div>
+              <PhotoCapture
+                v-model="paymentForm.receipt_image_path"
+                label="Beleg fotografieren"
+              />
+            </template>
+
+            <v-alert
+              v-if="myBalance && myBalance.remaining_cents > 0"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mt-3"
+            >
+              Du schuldest noch {{ eur(myBalance.remaining_cents) }} für dieses Jahr.
+            </v-alert>
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showPaymentDialog = false">Abbrechen</v-btn>
           <v-btn
-            color="primary"
+            color="success"
             size="large"
-            :disabled="!paymentForm.amount || !paymentForm.to_user_id"
+            :disabled="!paymentForm.amount"
             @click="savePayment"
           >
             <v-icon start icon="mdi-check" />
-            Speichern
+            Einzahlen
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
 
-    <!-- ═══ Category Dialog ══════════════════════════════════════ -->
-    <v-dialog v-model="showCategoryDialog" max-width="400">
+    <!-- ═══ Recurring Cost Dialog (Admin) ══════════════════════ -->
+    <v-dialog v-model="showRecurringDialog" max-width="500">
       <v-card>
-        <v-card-title>Neue Kategorie</v-card-title>
+        <v-card-title>Laufende Kosten anlegen</v-card-title>
         <v-card-text>
-          <v-form @submit.prevent="saveCategory">
+          <v-form @submit.prevent="saveRecurring">
             <v-text-field
-              v-model="categoryForm.name"
-              label="Name *"
-              placeholder="z.B. Saatgut"
+              v-model="recurringForm.description"
+              label="Beschreibung *"
+              placeholder="z.B. Pacht, Wasser, Versicherung"
               autofocus
-              class="mb-2"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
             />
+
             <v-text-field
-              v-model="categoryForm.icon"
-              label="Icon (Emoji)"
-              placeholder="z.B. 🌱"
-              maxlength="5"
+              v-model.number="recurringForm.amount"
+              label="Betrag (€) *"
+              type="number"
+              min="0.01"
+              step="0.01"
+              prefix="€"
+              inputmode="decimal"
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
+            />
+
+            <v-btn-toggle
+              v-model="recurringForm.interval"
+              mandatory
+              color="primary"
+              class="mb-3"
+              density="comfortable"
+            >
+              <v-btn value="monthly">Monatlich</v-btn>
+              <v-btn value="yearly">Jährlich</v-btn>
+            </v-btn-toggle>
+
+            <v-textarea
+              v-model="recurringForm.notes"
+              label="Notizen"
+              rows="2"
+              variant="outlined"
+              density="comfortable"
             />
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="showCategoryDialog = false">Abbrechen</v-btn>
-          <v-btn color="primary" :disabled="!categoryForm.name" @click="saveCategory">Speichern</v-btn>
+          <v-btn variant="text" @click="showRecurringDialog = false">Abbrechen</v-btn>
+          <v-btn
+            color="primary"
+            :disabled="!recurringForm.amount || !recurringForm.description"
+            @click="saveRecurring"
+          >
+            Speichern
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
