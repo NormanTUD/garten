@@ -11,14 +11,25 @@ async def calculate_balance(db: AsyncSession) -> BalanceOverview:
 
     For each user:
     - total_paid = sum of expenses they created (they paid for the group)
-    - total_share = sum of their splits (what they owe)
-    - total_sent = sum of payments they sent
-    - total_received = sum of payments they received
-    - balance = total_paid - total_share - total_sent + total_received
-      Positive = others owe you, Negative = you owe others
+    - total_share = sum of their splits (what they owe in total)
+    - total_sent = sum of payments they sent to others
+    - total_received = sum of payments they received from others
+
+    balance = (total_paid - total_share) - total_received + total_sent
+
+    Why this formula:
+    - (total_paid - total_share) = net credit from expenses
+      If you paid 1000 but only owe 500, you have +500 credit
+    - Receiving a payment SETTLES your credit (reduces it): - total_received
+    - Sending a payment SETTLES your debt (reduces it): + total_sent
+
+    Positive balance = others still owe you money
+    Negative balance = you still owe others money
     """
     # Get all active users
-    result = await db.execute(select(User).where(User.is_active.is_(True)).order_by(User.display_name))
+    result = await db.execute(
+        select(User).where(User.is_active.is_(True)).order_by(User.display_name)
+    )
     users = list(result.scalars().all())
 
     # Total paid per user (expenses they created)
@@ -35,14 +46,14 @@ async def calculate_balance(db: AsyncSession) -> BalanceOverview:
     )
     share_map = dict(share_result.all())
 
-    # Total sent per user
+    # Total sent per user (payments FROM this user)
     sent_result = await db.execute(
         select(Payment.from_user_id, func.coalesce(func.sum(Payment.amount_cents), 0))
         .group_by(Payment.from_user_id)
     )
     sent_map = dict(sent_result.all())
 
-    # Total received per user
+    # Total received per user (payments TO this user)
     received_result = await db.execute(
         select(Payment.to_user_id, func.coalesce(func.sum(Payment.amount_cents), 0))
         .group_by(Payment.to_user_id)
@@ -62,8 +73,8 @@ async def calculate_balance(db: AsyncSession) -> BalanceOverview:
         total_sent = sent_map.get(user.id, 0)
         total_received = received_map.get(user.id, 0)
 
-        # balance = what you paid for others - what you owe - what you already sent + what you received
-        balance = total_paid - total_share - total_sent + total_received
+        # Net credit from expenses, adjusted by payments
+        balance = (total_paid - total_share) - total_received + total_sent
 
         balances.append(
             UserBalance(

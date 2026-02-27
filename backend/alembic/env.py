@@ -16,6 +16,7 @@ from app.beds.models import Bed, BedPlanting  # noqa: F401
 from app.plants.models import Plant  # noqa: F401
 from app.harvest.models import Harvest  # noqa: F401
 from app.watering.models import FertilizingEvent, WateringEvent  # noqa: F401
+from app.finance.models import Expense, ExpenseCategory, ExpenseSplit, Payment  # noqa: F401
 
 config = context.config
 
