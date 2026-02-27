@@ -75,6 +75,7 @@ class ExpenseUpdate(BaseModel):
     recurrence_interval: str | None = Field(
         default=None, pattern=r"^(monthly|quarterly|yearly)$"
     )
+    receipt_image_path: str | None = None
     notes: str | None = None
 
 
