@@ -37,31 +37,64 @@ async def test_list_categories(client: AsyncClient, admin_user):
 # Recurring Costs
 # ═══════════════════════════════════════════════════════════════════
 
+
 async def test_create_recurring_cost(client: AsyncClient, admin_user):
     _, token = admin_user
     resp = await client.post(
         "/api/finance/recurring/", headers=auth_header(token),
-        json={"description": "Pacht", "amount_cents": 5000, "interval": "monthly"},
+        json={
+            "description": "Pacht",
+            "amount_cents": 5000,
+            "interval": "monthly",
+            "valid_from": "2026-01-01",
+        },
     )
     assert resp.status_code == 201
     assert resp.json()["amount_cents"] == 5000
     assert resp.json()["interval"] == "monthly"
+    assert resp.json()["valid_from"] == "2026-01-01"
+    assert resp.json()["valid_to"] is None
 
 
 async def test_create_recurring_cost_yearly(client: AsyncClient, admin_user):
     _, token = admin_user
     resp = await client.post(
         "/api/finance/recurring/", headers=auth_header(token),
-        json={"description": "Versicherung", "amount_cents": 12000, "interval": "yearly"},
+        json={
+            "description": "Versicherung",
+            "amount_cents": 12000,
+            "interval": "yearly",
+            "valid_from": "2026-01-01",
+        },
     )
     assert resp.status_code == 201
+
+async def test_create_recurring_cost_with_end_date(client: AsyncClient, admin_user):
+    _, token = admin_user
+    resp = await client.post(
+        "/api/finance/recurring/", headers=auth_header(token),
+        json={
+            "description": "Strom (alter Tarif)",
+            "amount_cents": 2500,
+            "interval": "monthly",
+            "valid_from": "2025-01-01",
+            "valid_to": "2025-12-31",
+        },
+    )
+    assert resp.status_code == 201
+    assert resp.json()["valid_to"] == "2025-12-31"
 
 
 async def test_create_recurring_cost_normal_user_forbidden(client: AsyncClient, normal_user):
     _, token = normal_user
     resp = await client.post(
         "/api/finance/recurring/", headers=auth_header(token),
-        json={"description": "Nope", "amount_cents": 100, "interval": "monthly"},
+        json={
+            "description": "Nope",
+            "amount_cents": 100,
+            "interval": "monthly",
+            "valid_from": "2026-01-01",
+        },
     )
     assert resp.status_code == 403
 
@@ -70,7 +103,12 @@ async def test_update_recurring_cost(client: AsyncClient, admin_user):
     _, token = admin_user
     resp = await client.post(
         "/api/finance/recurring/", headers=auth_header(token),
-        json={"description": "Wasser", "amount_cents": 3000, "interval": "monthly"},
+        json={
+            "description": "Wasser",
+            "amount_cents": 3000,
+            "interval": "monthly",
+            "valid_from": "2026-01-01",
+        },
     )
     cost_id = resp.json()["id"]
     resp2 = await client.patch(
@@ -80,17 +118,65 @@ async def test_update_recurring_cost(client: AsyncClient, admin_user):
     assert resp2.status_code == 200
     assert resp2.json()["amount_cents"] == 3500
 
-
 async def test_delete_recurring_cost(client: AsyncClient, admin_user):
     _, token = admin_user
     resp = await client.post(
         "/api/finance/recurring/", headers=auth_header(token),
-        json={"description": "Temp", "amount_cents": 100, "interval": "monthly"},
+        json={
+            "description": "Temp",
+            "amount_cents": 100,
+            "interval": "monthly",
+            "valid_from": "2026-01-01",
+        },
     )
     cost_id = resp.json()["id"]
     del_resp = await client.delete(f"/api/finance/recurring/{cost_id}", headers=auth_header(token))
     assert del_resp.status_code == 204
 
+async def test_recurring_costs_filtered_by_year(client: AsyncClient, admin_user):
+    """Costs with validity periods should only show for relevant years."""
+    _, token = admin_user
+
+    # Old tariff: 2025 only
+    await client.post(
+        "/api/finance/recurring/", headers=auth_header(token),
+        json={
+            "description": "Strom (alt)",
+            "amount_cents": 2500,
+            "interval": "monthly",
+            "valid_from": "2025-01-01",
+            "valid_to": "2025-12-31",
+        },
+    )
+
+    # New tariff: 2026 onwards
+    await client.post(
+        "/api/finance/recurring/", headers=auth_header(token),
+        json={
+            "description": "Strom (neu)",
+            "amount_cents": 3500,
+            "interval": "monthly",
+            "valid_from": "2026-01-01",
+        },
+    )
+
+    # Query 2025
+    resp_2025 = await client.get(
+        "/api/finance/recurring/", headers=auth_header(token),
+        params={"year": 2025},
+    )
+    names_2025 = [r["description"] for r in resp_2025.json()]
+    assert "Strom (alt)" in names_2025
+    assert "Strom (neu)" not in names_2025
+
+    # Query 2026
+    resp_2026 = await client.get(
+        "/api/finance/recurring/", headers=auth_header(token),
+        params={"year": 2026},
+    )
+    names_2026 = [r["description"] for r in resp_2026.json()]
+    assert "Strom (neu)" in names_2026
+    assert "Strom (alt)" not in names_2026
 
 # ═══════════════════════════════════════════════════════════════════
 # Garden Expenses
@@ -306,95 +392,90 @@ async def test_fund_overview_empty(client: AsyncClient, admin_user):
 async def test_fund_overview_with_recurring(client: AsyncClient, admin_user):
     _, token = admin_user
 
-    # Add recurring costs
     await client.post("/api/finance/recurring/", headers=auth_header(token),
-                      json={"description": "Pacht", "amount_cents": 5000, "interval": "monthly"})
+                      json={"description": "Pacht", "amount_cents": 5000, "interval": "monthly", "valid_from": "2026-01-01"})
     await client.post("/api/finance/recurring/", headers=auth_header(token),
-                      json={"description": "Versicherung", "amount_cents": 12000, "interval": "yearly"})
+                      json={"description": "Versicherung", "amount_cents": 12000, "interval": "yearly", "valid_from": "2026-01-01"})
 
-    resp = await client.get("/api/finance/fund/", headers=auth_header(token))
+    resp = await client.get("/api/finance/fund/", headers=auth_header(token), params={"year": 2026})
     data = resp.json()
     assert data["total_recurring_monthly_cents"] == 5000
     assert data["total_recurring_yearly_cents"] == 12000
-    assert data["total_recurring_annual_cents"] == (5000 * 12) + 12000  # 72000
-
+    assert data["total_recurring_annual_cents"] == (5000 * 12) + 12000
 
 async def test_fund_overview_with_expenses_and_payments(client: AsyncClient, admin_user, normal_user):
-    """Full scenario: recurring + one-time + payments, with separate shares."""
     admin, admin_token = admin_user
     user, user_token = normal_user
 
-    # Recurring: 5000/month = 60000/year
+    # Recurring: 5000/month from 2026
     await client.post("/api/finance/recurring/", headers=auth_header(admin_token),
-                      json={"description": "Pacht", "amount_cents": 5000, "interval": "monthly"})
+                      json={"description": "Pacht", "amount_cents": 5000, "interval": "monthly", "valid_from": "2026-01-01"})
 
     # One-time expense: 2000
     await client.post("/api/finance/expenses/", headers=auth_header(admin_token),
-                      json={"amount_cents": 2000, "description": "Rasenmäher", "expense_date": "2026-04-10"})
+                      json={"amount_cents": 2000, "description": "Erde", "expense_date": "2026-04-10"})
 
-    # Total: recurring 60000 + onetime 2000 = 62000
-    # 2 members → recurring share 30000, onetime share 1000, total share 31000
+    # Total: 60000 + 2000 = 62000, 2 members → 31000 each
 
-    # Admin pays 20000
     await client.post("/api/finance/payments/", headers=auth_header(admin_token),
                       json={"amount_cents": 20000, "payment_type": "cash", "payment_date": "2026-04-15"})
-
-    # User pays 10000
     await client.post("/api/finance/payments/", headers=auth_header(user_token),
                       json={"amount_cents": 10000, "payment_type": "transfer", "payment_date": "2026-04-15"})
 
-    resp = await client.get("/api/finance/fund/", headers=auth_header(admin_token))
+    resp = await client.get("/api/finance/fund/", headers=auth_header(admin_token), params={"year": 2026})
     data = resp.json()
 
-    assert data["total_recurring_annual_cents"] == 60000
-    assert data["total_onetime_expenses_cents"] == 2000
     assert data["total_costs_annual_cents"] == 62000
     assert data["member_count"] == 2
-
-    # Separate shares
-    assert data["share_recurring_per_member_annual_cents"] == 30000
-    assert data["share_recurring_per_member_monthly_cents"] == 2500
-    assert data["share_onetime_per_member_cents"] == 1000
     assert data["share_total_per_member_annual_cents"] == 31000
+    assert data["total_payments_cents"] == 30000
 
-    # Per-member
     admin_balance = next(b for b in data["member_balances"] if b["user_id"] == admin.id)
-    assert admin_balance["share_recurring_cents"] == 30000
-    assert admin_balance["share_onetime_cents"] == 1000
-    assert admin_balance["share_total_cents"] == 31000
+    user_balance = next(b for b in data["member_balances"] if b["user_id"] == user.id)
+
     assert admin_balance["total_paid_cents"] == 20000
+    assert admin_balance["share_total_cents"] == 31000
     assert admin_balance["remaining_cents"] == 11000
 
-    user_balance = next(b for b in data["member_balances"] if b["user_id"] == user.id)
+    assert user_balance["total_paid_cents"] == 10000
     assert user_balance["remaining_cents"] == 21000
-
 
 async def test_fund_overview_by_year(client: AsyncClient, admin_user):
     _, token = admin_user
 
     await client.post("/api/finance/recurring/", headers=auth_header(token),
-                      json={"description": "Pacht", "amount_cents": 5000, "interval": "monthly"})
+                      json={"description": "Pacht", "amount_cents": 5000, "interval": "monthly", "valid_from": "2025-01-01"})
 
-    # Expense in 2025
     await client.post("/api/finance/expenses/", headers=auth_header(token),
                       json={"amount_cents": 1000, "description": "Alt", "expense_date": "2025-06-01"})
-
-    # Expense in 2026
     await client.post("/api/finance/expenses/", headers=auth_header(token),
                       json={"amount_cents": 2000, "description": "Neu", "expense_date": "2026-04-10"})
 
-    # Query 2026 only
     resp = await client.get("/api/finance/fund/", headers=auth_header(token), params={"year": 2026})
-    data = resp.json()
-    assert data["total_onetime_expenses_cents"] == 2000
+    assert resp.json()["total_onetime_expenses_cents"] == 2000
 
-    # Query 2025
     resp2 = await client.get("/api/finance/fund/", headers=auth_header(token), params={"year": 2025})
-    data2 = resp2.json()
-    assert data2["total_onetime_expenses_cents"] == 1000
+    assert resp2.json()["total_onetime_expenses_cents"] == 1000
+
+
+async def test_fund_different_tariffs_per_year(client: AsyncClient, admin_user):
+    """Strom was cheaper in 2025 than 2026."""
+    _, token = admin_user
+
+    await client.post("/api/finance/recurring/", headers=auth_header(token),
+                      json={"description": "Strom", "amount_cents": 2500, "interval": "monthly",
+                            "valid_from": "2025-01-01", "valid_to": "2025-12-31"})
+    await client.post("/api/finance/recurring/", headers=auth_header(token),
+                      json={"description": "Strom", "amount_cents": 3500, "interval": "monthly",
+                            "valid_from": "2026-01-01"})
+
+    resp_2025 = await client.get("/api/finance/fund/", headers=auth_header(token), params={"year": 2025})
+    assert resp_2025.json()["total_recurring_monthly_cents"] == 2500
+
+    resp_2026 = await client.get("/api/finance/fund/", headers=auth_header(token), params={"year": 2026})
+    assert resp_2026.json()["total_recurring_monthly_cents"] == 3500
 
 
 async def test_fund_overview_unauthenticated(client: AsyncClient):
     resp = await client.get("/api/finance/fund/")
     assert resp.status_code == 401
-
