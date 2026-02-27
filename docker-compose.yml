@@ -38,7 +38,7 @@ services:
     container_name: gartenapp-apache
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8181:80"
       - "443:443"
     volumes:
       - ./apache/certs:/etc/ssl/gartenapp:ro
