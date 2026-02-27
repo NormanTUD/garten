@@ -85,6 +85,13 @@ const recurring = ref<RecurringCost[]>([]);
 const expenses = ref<GardenExpense[]>([]);
 const payments = ref<MemberPayment[]>([]);
 const fund = ref<FundOverview | null>(null);
+interface UserInfo {
+  id: number;
+  username: string;
+  display_name: string;
+}
+
+const users = ref<UserInfo[]>([]);
 
 // Expense quick-entry
 const showExpenseDialog = ref(false);
