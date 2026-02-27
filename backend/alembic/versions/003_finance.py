@@ -71,9 +71,13 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.Column("is_shared", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("confirmed_by_admin", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("confirmed_by_id", sa.Integer(), nullable=True),
+
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["category_id"], ["expense_categories.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["confirmed_by_id"], ["users.id"], ondelete="SET NULL"),
     )
     op.create_index("ix_garden_expenses_user_id", "garden_expenses", ["user_id"])
     op.create_index("ix_garden_expenses_expense_date", "garden_expenses", ["expense_date"])

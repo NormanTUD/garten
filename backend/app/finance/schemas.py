@@ -111,10 +111,13 @@ class GardenExpenseRead(BaseModel):
     amount_cents: int
     description: str
     expense_date: date
-    is_shared: bool  # NEU
+    is_shared: bool
+    confirmed_by_admin: bool
+    confirmed_by_id: int | None
     receipt_image_path: str | None
     notes: str | None
     created_at: datetime
+
 
 # ─── Member Payment ────────────────────────────────────────────────
 

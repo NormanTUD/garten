@@ -35,6 +35,8 @@ interface GardenExpense {
   description: string;
   expense_date: string;
   is_shared: boolean;
+  confirmed_by_admin: boolean;
+  confirmed_by_id: number | null;
   receipt_image_path: string | null;
   notes: string | null;
 }
@@ -513,6 +515,11 @@ async function removeSkip(orderId: number, skipId: number) {
   await api.delete(`/finance/standing-orders/${orderId}/skip/${skipId}`);
   await loadAll();
 }
+
+async function confirmExpense(id: number) {
+  await api.patch(`/finance/expenses/${id}/confirm`);
+  await loadAll();
+}
 </script>
 
 <template>
@@ -673,14 +680,44 @@ async function removeSkip(orderId: number, skipId: number) {
               <v-table v-else density="compact" class="mb-3">
                 <thead><tr><th>Datum</th><th>Posten</th><th>Von</th><th class="text-right">Betrag</th></tr></thead>
                 <tbody>
-                  <tr v-for="e in expenses.filter(x => x.is_shared)" :key="'calc-e-' + e.id">
+		  <tr v-for="e in expenses.filter(x => x.is_shared && x.confirmed_by_admin)" :key="'calc-e-' + e.id">
                     <td>{{ new Date(e.expense_date).toLocaleDateString('de-DE') }}</td>
                     <td>{{ e.description }}
                       <v-chip v-if="e.category" size="x-small" class="ml-1" variant="tonal">{{ e.category.icon || '' }} {{ e.category.name }}</v-chip>
+	  	        <v-chip v-if="e.is_shared && !e.confirmed_by_admin && e.user.id !== auth.user?.id" size="x-small" color="warning" variant="flat" class="ml-1">
+			  ⏳ Bestätigung ausstehend
+			</v-chip>
+			<v-chip v-if="e.is_shared && e.confirmed_by_admin" size="x-small" color="success" variant="flat" class="ml-1">
+			  ✓ Bestätigt
+			</v-chip>
+
                     </td>
                     <td>{{ e.user.display_name }}</td>
                     <td class="text-right font-weight-bold">{{ eur(e.amount_cents) }}
+			  <v-btn
+			    v-if="auth.isAdmin && e.is_shared && !e.confirmed_by_admin"
+			    size="x-small"
+			    color="success"
+			    variant="tonal"
+			    class="mr-1"
+			    @click.stop="confirmExpense(e.id)"
+			  >
+			    ✓ Bestätigen
+			  </v-btn>
+
                       <v-btn v-if="auth.isAdmin" size="x-small" icon="mdi-delete" variant="text" color="error" density="compact" class="ml-1" @click="deleteExpense(e.id)" />
+                    </td>
+                  </tr>
+		  <tr v-for="e in expenses.filter(x => x.is_shared && !x.confirmed_by_admin)" :key="'calc-pending-' + e.id" class="text-medium-emphasis">
+                    <td>{{ new Date(e.expense_date).toLocaleDateString('de-DE') }}</td>
+                    <td>
+                      {{ e.description }}
+                      <v-chip size="x-small" color="warning" variant="flat" class="ml-1">⏳ unbestätigt</v-chip>
+                    </td>
+                    <td>{{ e.user.display_name }}</td>
+                    <td class="text-right">
+                      {{ eur(e.amount_cents) }}
+                      <v-btn v-if="auth.isAdmin" size="x-small" color="success" variant="tonal" density="compact" class="ml-1" @click="confirmExpense(e.id)">✓</v-btn>
                     </td>
                   </tr>
                   <tr class="bg-grey-lighten-4">

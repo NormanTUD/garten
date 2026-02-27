@@ -76,6 +76,10 @@ class GardenExpense(Base):
 
     user: Mapped["User"] = relationship(lazy="selectin")  # noqa: F821
     category: Mapped["ExpenseCategory | None"] = relationship(lazy="selectin")
+    confirmed_by_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    confirmed_by_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
 
 class MemberPayment(Base):

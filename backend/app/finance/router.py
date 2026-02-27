@@ -125,15 +125,90 @@ async def list_expenses(
 
 @expense_router.post("/", response_model=GardenExpenseRead, status_code=status.HTTP_201_CREATED)
 async def create_expense(data: GardenExpenseCreate, user: CurrentUser, db: DBSession):
-    """Create a garden expense. Category can be set by ID or by name (auto-created)."""
-    if data.category_id is not None:
-        category = await service.get_category_by_id(db, data.category_id)
-        if category is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     expense = await service.create_expense(db, user.id, data)
     await db.refresh(expense)
+
+    # If non-admin creates a shared expense → notify all admins
+    if data.is_shared and user.role != "admin":
+        from app.messaging import service as msg_service
+        from app.auth.models import User
+        from sqlalchemy import select
+
+        result = await db.execute(
+            select(User).where(User.role == "admin").where(User.is_active.is_(True))
+        )
+        admins = list(result.scalars().all())
+
+        amount_str = f"{expense.amount_cents / 100:.2f} €"
+        for admin in admins:
+            await msg_service.send_system_message(
+                db,
+                recipient_id=admin.id,
+                subject=f"Ausgabe zur Bestätigung: {expense.description}",
+                body=(
+                    f"{user.display_name} hat eine Ausgabe von {amount_str} eingetragen "
+                    f"und möchte sie auf alle umlegen:\n\n"
+                    f"Beschreibung: {expense.description}\n"
+                    f"Betrag: {amount_str}\n"
+                    f"Datum: {expense.expense_date}\n\n"
+                    f"Bitte bestätige die Umlage in der Finanzübersicht."
+                ),
+                message_type="auto:expense_approval",
+                related_entity="expense",
+                related_entity_id=expense.id,
+            )
+
     return expense
 
+
+@expense_router.patch("/{expense_id}/confirm", response_model=GardenExpenseRead)
+async def confirm_expense(expense_id: int, admin: AdminUser, db: DBSession):
+    """Admin confirms a shared expense. Marks related messages as read."""
+    from sqlalchemy import select, update
+    from app.finance.models import GardenExpense
+    from app.messaging.models import Message
+
+    result = await db.execute(select(GardenExpense).where(GardenExpense.id == expense_id))
+    expense = result.scalar_one_or_none()
+    if expense is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
+
+    if expense.confirmed_by_admin:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already confirmed")
+
+    # Confirm
+    expense.confirmed_by_admin = True
+    expense.confirmed_by_id = admin.id
+    await db.flush()
+
+    # Mark all related approval messages as read for all admins
+    await db.execute(
+        update(Message)
+        .where(Message.related_entity == "expense")
+        .where(Message.related_entity_id == expense_id)
+        .where(Message.message_type == "auto:expense_approval")
+        .values(is_read=True)
+    )
+    await db.flush()
+
+    # Notify the expense creator
+    from app.messaging import service as msg_service
+    amount_str = f"{expense.amount_cents / 100:.2f} €"
+    await msg_service.send_system_message(
+        db,
+        recipient_id=expense.user_id,
+        subject=f"Ausgabe bestätigt ✓: {expense.description}",
+        body=(
+            f"Deine Ausgabe von {amount_str} ({expense.description}) wurde von "
+            f"{admin.display_name} bestätigt und wird auf alle umgelegt."
+        ),
+        message_type="auto:expense_confirmed",
+        related_entity="expense",
+        related_entity_id=expense.id,
+    )
+
+    await db.refresh(expense)
+    return expense
 
 @expense_router.get("/{expense_id}", response_model=GardenExpenseRead)
 async def get_expense(expense_id: int, user: CurrentUser, db: DBSession):

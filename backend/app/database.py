@@ -75,3 +75,4 @@ async def get_db():
             await session.rollback()
             raise
 
+get_async_session = get_db

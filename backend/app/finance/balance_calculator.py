@@ -19,7 +19,6 @@ def _months_active_in_year(valid_from: date, valid_to: date | None, year: int) -
 
 
 def _active_months_list(valid_from: date, valid_to: date | None, year: int) -> list[int]:
-    """Return list of month numbers (1-12) where a standing order is active."""
     year_start = date(year, 1, 1)
     year_end = date(year, 12, 31)
     start = max(valid_from, year_start)
@@ -65,13 +64,24 @@ async def calculate_fund_overview(
     total_recurring_annual = total_from_monthly + total_from_yearly
 
     # ─── One-time expenses (shared only) ───────────────────────
-    onetime_result = await db.execute(
-        select(func.coalesce(func.sum(GardenExpense.amount_cents), 0))
+    # Admin expenses count immediately, non-admin need confirmation
+    all_expenses_result = await db.execute(
+        select(GardenExpense)
         .where(GardenExpense.expense_date >= year_start)
         .where(GardenExpense.expense_date <= year_end)
         .where(GardenExpense.is_shared.is_(True))
     )
-    total_onetime = onetime_result.scalar() or 0
+    all_shared_expenses = list(all_expenses_result.scalars().all())
+
+    admin_ids_result = await db.execute(
+        select(User.id).where(User.role == "admin")
+    )
+    admin_ids = set(admin_ids_result.scalars().all())
+
+    total_onetime = sum(
+        e.amount_cents for e in all_shared_expenses
+        if e.user_id in admin_ids or e.confirmed_by_admin
+    )
 
     total_costs_annual = total_recurring_annual + total_onetime
 
@@ -110,8 +120,7 @@ async def calculate_fund_overview(
     )
     standing_orders = list(standing_result.scalars().all())
 
-    # Calculate per-user standing order totals
-    standing_map: dict[int, int] = {}  # user_id -> total cents paid via standing orders
+    standing_map: dict[int, int] = {}
     for order in standing_orders:
         active_months = _active_months_list(order.valid_from, order.valid_to, year)
         skipped_months = {s.month for s in order.skips if s.year == year}
@@ -164,3 +173,4 @@ async def calculate_fund_overview(
         member_count=member_count,
         member_balances=member_balances,
     )
+
