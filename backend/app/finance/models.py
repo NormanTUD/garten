@@ -54,6 +54,7 @@ class RecurringCost(Base):
 
 
 class GardenExpense(Base):
+    """One-time garden expense."""
     __tablename__ = "garden_expenses"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -65,8 +66,12 @@ class GardenExpense(Base):
     )
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
-    expense_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    expense_date: Mapped[date] = mapped_column(Date, nullable=False)
     is_shared: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    confirmed_by_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    confirmed_by_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     receipt_image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     ocr_raw_result: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -74,12 +79,11 @@ class GardenExpense(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
-    user: Mapped["User"] = relationship(lazy="selectin")  # noqa: F821
+    # Explicit foreign_keys to resolve ambiguity
+    user: Mapped["User"] = relationship(foreign_keys=[user_id], lazy="selectin")  # noqa: F821
+    confirmed_by: Mapped["User | None"] = relationship(foreign_keys=[confirmed_by_id], lazy="selectin")  # noqa: F821
     category: Mapped["ExpenseCategory | None"] = relationship(lazy="selectin")
-    confirmed_by_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    confirmed_by_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+
 
 
 class MemberPayment(Base):

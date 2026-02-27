@@ -1,7 +1,8 @@
 import logging
 
-from sqlalchemy import event, text
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
 
@@ -11,7 +12,7 @@ engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
     connect_args={
-        "timeout": 30,  # Wait up to 30s for locks
+        "timeout": 30,
     },
     pool_pre_ping=True,
     pool_size=5,
@@ -24,7 +25,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     """Enable WAL mode and busy timeout for SQLite."""
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=30000")  # 30 seconds
+    cursor.execute("PRAGMA busy_timeout=30000")
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
@@ -36,31 +37,23 @@ async_session_factory = async_sessionmaker(
     expire_on_commit=False,
 )
 
-# Import Base from a separate module to avoid circular imports
-from sqlalchemy.orm import DeclarativeBase  # noqa: E402
-
 
 class Base(DeclarativeBase):
     pass
 
 
 async def create_all_tables() -> None:
-    from app.audit.models import AuditLog  # noqa: F401
-    from app.auth.models import User  # noqa: F401
-    from app.beds.models import Bed, Planting  # noqa: F401
-    from app.finance.models import (  # noqa: F401
-        ExpenseCategory,
-        GardenExpense,
-        MemberPayment,
-        RecurringCost,
-        StandingOrder,
-        StandingOrderSkip,
-    )
-    from app.garden.models import Garden  # noqa: F401
-    from app.harvest.models import Harvest  # noqa: F401
-    from app.messaging.models import AutoMessageRule, Message  # noqa: F401
-    from app.plants.models import Plant  # noqa: F401
-    from app.watering.models import FertilizingLog, WateringLog  # noqa: F401
+    # Import all models so Base.metadata knows about them
+    # Use module imports to avoid needing exact class names
+    from app.audit import models as _audit  # noqa: F401
+    from app.auth import models as _auth  # noqa: F401
+    from app.beds import models as _beds  # noqa: F401
+    from app.finance import models as _finance  # noqa: F401
+    from app.garden import models as _garden  # noqa: F401
+    from app.harvest import models as _harvest  # noqa: F401
+    from app.messaging import models as _messaging  # noqa: F401
+    from app.plants import models as _plants  # noqa: F401
+    from app.watering import models as _watering  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -75,4 +68,7 @@ async def get_db():
             await session.rollback()
             raise
 
+
+# Backward-compatible alias
 get_async_session = get_db
+
