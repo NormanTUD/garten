@@ -1,0 +1,182 @@
+# Projekt: GartenApp – Schrebergarten-Management-System
+
+## Kontext
+Ich bin ein erfahrener Fullstack-Entwickler (~20 Jahre Erfahrung) und möchte eine
+umfassende Garten-Management-Webanwendung für unseren Schrebergarten entwickeln.
+Wir sind 5-10 Personen. Das System soll auf einem eigenen Linux-Server (Debian)
+laufen, dockerisiert sein, und als PWA auch auf dem Handy funktionieren.
+
+Bitte entwickle mit mir zusammen dieses Projekt **Schritt für Schritt, Phase für Phase**.
+Warte nach jeder Phase auf mein Feedback bevor du weitermachst. Schreibe sauberen,
+modularen, gut getesteten Code. Jede Datei soll klein und fokussiert sein (Single
+Responsibility). Erkläre Architekturentscheidungen kurz, aber halte dich nicht mit
+Basics auf – ich bin erfahren.
+
+---
+
+## Tech-Stack
+
+### Backend
+- **Python 3.12+**
+- **FastAPI** (async, automatische OpenAPI-Docs)
+- **SQLAlchemy 2.0** (async, ORM) mit **Alembic** (Migrations)
+- **SQLite** als Datenbank (später einfach auf PostgreSQL wechselbar)
+- **Pydantic v2** für Validierung/Serialisierung
+- **JWT-basierte Authentifizierung** (Access + Refresh Tokens)
+- **Pytest** + **httpx** für Tests
+- **PaddleOCR** oder **Qwen-VL** (lokal, für Rechnungs-OCR, Phase 3)
+
+### Frontend
+- **Vue 3** (Composition API, `<script setup>`)
+- **Vuetify 3** (Material Design, mobile-first)
+- **Pinia** (State Management)
+- **Vue Router**
+- **Leaflet** + **OpenStreetMap** mit Satellitenbildern (ESRI/Mapbox) für Gartenkarte
+- **TensorFlow.js** (clientseitig, für spätere Bilderkennung, Phase 4)
+- **PWA** (installierbar auf Android/iOS Homescreen, Service Worker)
+- **Vitest** + **Playwright** für Tests
+
+### DevOps
+- **Docker** + **Docker Compose**
+- **GitHub Actions** CI/CD Pipeline
+- **Nginx** als Reverse Proxy
+- Automatische **Linting** (Ruff für Python, ESLint + Prettier für JS)
+
+---
+
+## Architektur-Prinzipien
+
+1. **Ultra-modular**: Viele kleine Dateien, klare Ordnerstruktur, Single Responsibility
+2. **API-First**: Alles läuft über die REST-API, Frontend ist ein reiner Client
+3. **Jeder API-Zugriff wird geloggt** (User, Endpoint, Timestamp, Request/Response)
+4. **Vollständig testbar**: Unit Tests, Integration Tests, E2E Tests
+5. **Backup-freundlich**: DB-Dump Export/Import per API und CLI
+6. **Erweiterbar**: Datenmodelle sind flexibel (dynamische Felder/Tags wo sinnvoll)
+7. **Code-Sprache**: Englisch (Variablen, Kommentare, API-Endpunkte, Git Commits)
+8. **UI-Sprache**: Deutsch
+
+---
+
+## Datenmodell (Kern-Entities)
+
+### Users & Auth
+- **User**: id, username, password_hash, display_name, role (admin/user),
+  created_at, is_active
+- **APIKey**: id, user_id, key_hash, label, created_at, last_used, is_active
+- **AuditLog**: id, user_id, method, endpoint, request_body, response_status,
+  ip_address, timestamp
+
+### Gartenstruktur
+- **Garden**: id, name, description, location (lat/lng), total_area_sqm
+- **Bed**: id, garden_id, name, description, geometry (GeoJSON Polygon für
+  Leaflet-Karte), area_sqm, soil_type, sun_exposure, created_at
+- **Plant**: id, name, variety, category, icon, expected_water_needs,
+  growing_season_start, growing_season_end, notes
+  (Pflanzen-Katalog der sich über die Zeit füllt)
+- **BedPlanting**: id, bed_id, plant_id, planted_at, expected_harvest,
+  status (active/harvested/removed), notes
+
+### Ernte-Tracking
+- **Harvest**: id, user_id, bed_id, plant_id, amount, unit (kg/stück/bund/...),
+  quality_rating, date, notes, created_at
+- **HarvestPhoto**: id, harvest_id, image_path, ai_detection_result, created_at
+
+### Bewässerung
+- **WateringEvent**: id, user_id, bed_id, started_at (exakte Zeit),
+  duration_minutes, water_amount_liters, method (manual/automatic),
+  weather_temp_c, weather_humidity_pct, weather_rain_mm,
+  weather_description, soil_moisture_before, soil_moisture_after, notes
+- **FertilizingEvent**: id, user_id, bed_id, fertilizer_type, amount,
+  unit, date, notes
+
+### Finanzen
+- **ExpenseCategory**: id, name, icon, is_active (dynamisch erweiterbar)
+- **Expense**: id, user_id, category_id, amount_cents, description, date,
+  is_recurring, recurrence_interval, receipt_image_path,
+  ocr_raw_result, created_at
+- **ExpenseSplit**: id, expense_id, user_id, share_amount_cents, is_settled
+- **Payment**: id, from_user_id, to_user_id, amount_cents, method
+  (cash/transfer/material), description, date, confirmed_by_admin
+
+### Gartenstunden (Vereinsarbeit)
+- **GardenDutyConfig**: id, year, required_hours_per_person,
+  hourly_rate_cents (Ausgleichszahlung)
+- **GardenDutyLog**: id, user_id, date, hours, description, confirmed_by (admin),
+  created_at
+- **GardenDutyBalance**: (computed view) user_id, year, hours_done,
+  hours_required, hours_remaining, compensation_due_cents
+
+### Sensor-Vorbereitung (für spätere Bewässerungs-KI)
+- **Sensor**: id, bed_id, type (soil_moisture/temperature/light/rain),
+  hardware_id, is_active, last_reading_at
+- **SensorReading**: id, sensor_id, value, unit, timestamp
+- **IrrigationZone**: id, name, beds (m2m), valve_hardware_id, is_active
+- **IrrigationSchedule**: id, zone_id, trigger_type (manual/scheduled/ai),
+  cron_expression, ai_model_version, is_active
+
+---
+
+## Ordnerstruktur
+
+gartenapp/ ├── docker-compose.yml ├── .github/ │ └── workflows/ │ ├── backend-ci.yml │ └── frontend-ci.yml ├── backend/ │ ├── Dockerfile │ ├── pyproject.toml │ ├── alembic/ │ │ └── versions/ │ ├── app/ │ │ ├── main.py # FastAPI app factory │ │ ├── config.py # Settings (pydantic-settings) │ │ ├── database.py # Engine, session, base │ │ ├── dependencies.py # Dependency injection │ │ ├── middleware/ │ │ │ ├── audit_log.py # Request/Response logging │ │ │ └── cors.py │ │ ├── auth/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ ├── models.py │ │ │ └── utils.py # JWT, hashing │ │ ├── users/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ └── models.py │ │ ├── garden/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ └── models.py │ │ ├── beds/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ └── models.py │ │ ├── plants/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ └── models.py │ │ ├── harvest/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ └── models.py │ │ ├── watering/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ └── models.py │ │ ├── finance/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ ├── models.py │ │ │ └── balance_calculator.py │ │ ├── duty/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ └── models.py │ │ ├── sensors/ │ │ │ ├── router.py │ │ │ ├── service.py │ │ │ ├── schemas.py │ │ │ └── models.py │ │ ├── backup/ │ │ │ ├── router.py │ │ │ └── service.py │ │ ├── weather/ │ │ │ └── service.py # OpenWeatherMap integration │ │ └── ocr/ │ │ └── service.py # Receipt OCR (Phase 3) │ └── tests/ │ ├── conftest.py # Fixtures, test DB │ ├── test_auth.py │ ├── test_users.py │ ├── test_harvest.py │ ├── test_watering.py │ ├── test_finance.py │ ├── test_duty.py │ ├── test_backup.py │ └── ... ├── frontend/ │ ├── Dockerfile │ ├── package.json │ ├── vite.config.ts │ ├── vitest.config.ts │ ├── playwright.config.ts │ ├── public/ │ │ ├── manifest.json # PWA manifest │ │ └── sw.js # Service Worker │ ├── src/ │ │ ├── main.ts │ │ ├── App.vue │ │ ├── router/ │ │ │ └── index.ts │ │ ├── stores/ │ │ │ ├── auth.ts │ │ │ ├── garden.ts │ │ │ ├── harvest.ts │ │ │ ├── watering.ts │ │ │ ├── finance.ts │ │ │ └── duty.ts │ │ ├── api/ │ │ │ ├── client.ts # Axios/fetch wrapper mit JWT │ │ │ ├── auth.ts │ │ │ ├── garden.ts │ │ │ ├── harvest.ts │ │ │ └── ... │ │ ├── components/ │ │ │ ├── layout/ │ │ │ │ ├── AppBar.vue │ │ │ │ ├── NavDrawer.vue │ │ │ │ └── BottomNav.vue # Mobile navigation │ │ │ ├── garden/ │ │ │ │ ├── GardenMap.vue # Leaflet Karte │ │ │ │ ├── BedEditor.vue # Polygon zeichnen │ │ │ │ └── BedCard.vue │ │ │ ├── harvest/ │ │ │ │ ├── HarvestForm.vue │ │ │ │ ├── HarvestList.vue │ │ │ │ └── HarvestStats.vue │ │ │ ├── watering/ │ │ │ │ ├── WateringForm.vue │ │ │ │ ├── WateringLog.vue │ │ │ │ └── WateringChart.vue │ │ │ ├── finance/ │ │ │ │ ├── ExpenseForm.vue │ │ │ │ ├── ExpenseList.vue │ │ │ │ ├── BalanceOverview.vue │ │ │ │ └── SplitCalculator.vue │ │ │ ├── duty/ │ │ │ │ ├── DutyForm.vue │ │ │ │ └── DutyOverview.vue │ │ │ ├── dashboard/ │ │ │ │ ├── DashboardMain.vue │ │ │ │ ├── StatCard.vue │ │ │ │ └── TimelineView.vue │ │ │ ├── admin/ │ │ │ │ ├── UserManager.vue │ │ │ │ ├── AuditLogViewer.vue │ │ │ │ ├── AlertPanel.vue │ │ │ │ └── BackupManager.vue │ │ │ └── shared/ │ │ │ ├── PhotoUpload.vue │ │ │ ├── SmartSelect.vue # Autocomplete der sich füllt │ │ │ ├── DateTimePicker.vue │ │ │ └── ConfirmDialog.vue │ │ ├── views/ │ │ │ ├── LoginView.vue │ │ │ ├── DashboardView.vue │ │ │ ├── GardenView.vue │ │ │ ├── HarvestView.vue │ │ │ ├── WateringView.vue │ │ │ ├── FinanceView.vue │ │ │ ├── DutyView.vue │ │ │ ├── CalendarView.vue │ │ │ ├── StatsView.vue │ │ │ └── AdminView.vue │ │ ├── composables/ │ │ │ ├── useAuth.ts │ │ │ ├── useNotification.ts │ │ │ └── useCamera.ts # Für Foto-Upload │ │ └── ai/ # Phase 4 │ │ ├── plantDetector.ts # TF.js YOLO wrapper │ │ └── models/ # .tflite / tfjs model files │ └── tests/ │ ├── unit/ │ └── e2e/ └── docs/ ├── API.md ├── SETUP.md └── ARCHITECTURE.md
+text
+
+
+---
+
+## Entwicklungsphasen
+
+### Phase 1: Foundation (Backend + Auth + Basis-CRUD + Minimales Frontend)
+1. Docker Compose Setup (Backend + Frontend + Nginx)
+2. FastAPI Projekt-Skeleton mit Config, DB, Middleware
+3. User Model + Auth (JWT, Login, Admin erstellt User)
+4. Audit-Log Middleware
+5. CRUD für: Garden, Beds, Plants (mit Alembic Migrations)
+6. CRUD für: Harvest, WateringEvent, FertilizingEvent
+7. Basis-Frontend: Login, Navigation, einfache Formulare
+8. PWA Setup (manifest, service worker)
+9. Tests für alles oben
+10. CI/CD Pipeline
+
+### Phase 2: Features & UX
+1. Leaflet Gartenkarte mit Satellitenbild + Polygon-Editor für Beete
+2. Dashboard mit Statistiken (Charts via Chart.js oder ApexCharts)
+3. Kalender/Timeline View
+4. Finanzsystem komplett (Ausgaben, Splits, Balance-Berechnung)
+5. Gartenstunden-Tracking + Ausgleichsberechnung
+6. SmartSelect-Komponente (Autocomplete, lernt aus bisherigen Einträgen)
+7. Foto-Upload für Ernten
+8. Backup Export/Import (API + Admin-UI)
+9. Admin-Panel (User-Verwaltung, Logs, Alerts)
+
+### Phase 3: KI-Features (Serverseitig)
+1. Rechnungs-OCR mit Qwen-VL oder PaddleOCR (lokal, serverseitig)
+2. Wetter-API Integration (OpenWeatherMap) – automatisch bei Gieß-Events
+3. Sensor-Datenmodell + API-Endpunkte (vorbereitet)
+
+### Phase 4: KI-Features (Clientseitig) + Bewässerung
+1. TF.js Integration im Frontend (Pflanzen-/Gemüseerkennung)
+2. Kamera → Erkennung → Vorausgefülltes Formular
+3. Bewässerungs-KI Datengrundlage (Gieß-History + Wetter + Sensoren)
+4. Irrigation Zones + Schedules (UI auf der Karte)
+
+---
+
+## Wichtige Regeln für die Entwicklung
+
+1. **Eine Phase nach der anderen.** Zeige mir am Ende jeder Phase die
+   vollständige Dateistruktur und frage nach Feedback.
+2. **Jede Datei einzeln.** Schreibe jede Datei komplett aus, keine Platzhalter
+   wie "# TODO" oder "...rest of code...".
+3. **Tests parallel zum Code.** Für jedes neue Modul sofort Tests schreiben.
+4. **Keine Abkürzungen.** Vollständiger, produktionsreifer Code.
+5. **Erkläre Architekturentscheidungen** kurz in 1-2 Sätzen wenn nötig.
+6. **Frage nach** wenn etwas unklar ist, statt Annahmen zu treffen.
+
+---
+
+## Los geht's!
+
+Starte mit **Phase 1, Schritt 1**: Docker Compose Setup.
+Zeige mir die Dateistruktur und die docker-compose.yml, Dockerfiles,
+und die Apache-Config. Warte dann auf mein OK bevor du weitermachst.
