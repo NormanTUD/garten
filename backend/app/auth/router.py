@@ -87,14 +87,15 @@ async def list_users(admin: AdminUser, db: DBSession):
 @user_router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(data: UserCreate, admin: AdminUser, db: DBSession):
     """Admin creates a new user."""
-    existing = await get_user_by_username(db, data.username)
+    existing = await service.get_user_by_username(db, data.username)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Username '{data.username}' already exists",
         )
-    user = await create_user_in_db(db, data)
+    user = await service.create_user(db, data)
     return user
+
 
 @user_router.get("/{user_id}", response_model=UserRead)
 async def get_user(user_id: int, admin: AdminUser, db: DBSession):
@@ -107,7 +108,7 @@ async def get_user(user_id: int, admin: AdminUser, db: DBSession):
 @user_router.patch("/{user_id}", response_model=UserRead)
 async def update_user(user_id: int, data: UserUpdate, admin: AdminUser, db: DBSession):
     """Admin updates a user. Cannot deactivate admins or self."""
-    user = await get_user_by_id(db, user_id)
+    user = await service.get_user_by_id(db, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -135,6 +136,7 @@ async def update_user(user_id: int, data: UserUpdate, admin: AdminUser, db: DBSe
     await db.flush()
     await db.refresh(user)
     return user
+
 
 @user_router.put("/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_reset_password(
