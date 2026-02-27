@@ -10,6 +10,7 @@ const navItems = [
   { title: "Garten & Beete", icon: "mdi-flower", to: "/garden" },
   { title: "Ernte", icon: "mdi-basket", to: "/harvest" },
   { title: "Bewässerung", icon: "mdi-water", to: "/watering" },
+  { title: "Finanzen", icon: "mdi-cash-register", to: "/finance" },
 ];
 
 const adminItems = [

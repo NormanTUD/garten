@@ -1,8 +1,12 @@
+import shutil
+import uuid
 from datetime import date
+from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File, status
 
-from app.dependencies import AdminUser, CurrentUser, DBSession
+from app.config import settings
+from app.dependencies import CurrentUser, DBSession
 from app.finance import service
 from app.finance.balance_calculator import calculate_balance
 from app.finance.schemas import (
@@ -23,6 +27,10 @@ category_router = APIRouter(prefix="/api/finance/categories", tags=["finance"])
 expense_router = APIRouter(prefix="/api/finance/expenses", tags=["finance"])
 payment_router = APIRouter(prefix="/api/finance/payments", tags=["finance"])
 balance_router = APIRouter(prefix="/api/finance/balance", tags=["finance"])
+receipt_router = APIRouter(prefix="/api/finance/receipts", tags=["finance"])
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 # ─── Categories ────────────────────────────────────────────────────
@@ -89,7 +97,6 @@ async def create_expense(data: ExpenseCreate, user: CurrentUser, db: DBSession):
         category = await service.get_category_by_id(db, data.category_id)
         if category is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-    # Validate manual splits sum
     if data.splits:
         splits_sum = sum(s.share_amount_cents for s in data.splits)
         if splits_sum != data.amount_cents:
@@ -201,7 +208,6 @@ async def update_payment(
     payment = await service.get_payment_by_id(db, payment_id)
     if payment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
-    # Only admin can confirm payments
     if data.confirmed_by_admin is not None and user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -225,4 +231,98 @@ async def delete_payment(payment_id: int, user: CurrentUser, db: DBSession):
 @balance_router.get("/", response_model=BalanceOverview)
 async def get_balance(user: CurrentUser, db: DBSession):
     return await calculate_balance(db)
+
+
+# ─── Receipt Upload ───────────────────────────────────────────────
+
+@receipt_router.post("/upload")
+async def upload_receipt(
+    user: CurrentUser,
+    file: UploadFile = File(...),
+):
+    """Upload a receipt image. Returns the file path for attaching to an expense.
+
+    The image is stored in uploads/receipts/ with a unique filename.
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ KI-INTEGRATION (Phase 3):                                       │
+    │                                                                  │
+    │ Nach dem Upload kann ein OCR-Endpoint aufgerufen werden:         │
+    │                                                                  │
+    │   POST /api/finance/receipts/ocr                                │
+    │   Body: { "image_path": "receipts/abc123.jpg" }                 │
+    │   Response: {                                                    │
+    │     "raw_text": "...",                                          │
+    │     "suggested_amount_cents": 1299,                             │
+    │     "suggested_description": "Baumarkt Erde 20L",              │
+    │     "suggested_category": "Erde & Substrate",                   │
+    │     "confidence": 0.87                                          │
+    │   }                                                              │
+    │                                                                  │
+    │ Implementierung:                                                 │
+    │ 1. Qwen-VL (empfohlen): Multimodal LLM, versteht Bilder       │
+    │    - pip install transformers torch                              │
+    │    - Model: Qwen/Qwen-VL-Chat (lokal, ~8GB VRAM)              │
+    │    - Prompt: "Extract total amount, store name, items from      │
+    │      this receipt. Return JSON."                                 │
+    │                                                                  │
+    │ 2. PaddleOCR (Alternative): Reines OCR, braucht Parsing        │
+    │    - pip install paddleocr paddlepaddle                         │
+    │    - Erkennt Text, aber kein semantisches Verständnis           │
+    │    - Braucht Regex/Heuristik für Betragsextraktion             │
+    │                                                                  │
+    │ 3. Integration in diesen Router:                                │
+    │    - Neuer Service: app/ocr/service.py                          │
+    │    - from app.ocr.service import extract_receipt_data           │
+    │    - result = await extract_receipt_data(image_path)            │
+    │    - Return suggested fields to frontend                        │
+    │    - Frontend füllt Formular vor, User bestätigt                │
+    └─────────────────────────────────────────────────────────────────┘
+    """
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"File type '{file.content_type}' not allowed. Use JPEG, PNG, or WebP.",
+        )
+
+    # Read file to check size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // 1024 // 1024} MB.",
+        )
+
+    # Generate unique filename
+    ext = Path(file.filename).suffix.lower() if file.filename else ".jpg"
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}:
+        ext = ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+
+    # Save file
+    receipt_dir = Path(settings.upload_dir) / "receipts"
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    file_path = receipt_dir / filename
+
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    return {
+        "filename": filename,
+        "path": f"receipts/{filename}",
+        "size_bytes": len(content),
+        "content_type": file.content_type,
+    }
+
+
+@receipt_router.get("/{filename}")
+async def get_receipt(filename: str, user: CurrentUser):
+    """Serve a receipt image."""
+    from fastapi.responses import FileResponse
+
+    file_path = Path(settings.upload_dir) / "receipts" / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
+
+    return FileResponse(file_path)
 

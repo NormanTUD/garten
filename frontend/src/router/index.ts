@@ -33,6 +33,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/finance",
+    name: "finance",
+    component: () => import("@/views/FinanceView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/admin",
     name: "admin",
     component: () => import("@/views/AdminView.vue"),
@@ -48,7 +54,6 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
 
-  // Initialize auth state on first navigation
   if (!auth.isAuthenticated && localStorage.getItem("access_token")) {
     await auth.initialize();
   }

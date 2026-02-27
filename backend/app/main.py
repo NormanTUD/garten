@@ -73,7 +73,6 @@ def setup_middleware(app: FastAPI, audit_session_factory=None) -> None:
         allow_headers=["*"],
     )
 
-
 def setup_routers(app: FastAPI) -> None:
     from app.audit.router import router as audit_router
     from app.auth.router import router as auth_router
@@ -84,6 +83,7 @@ def setup_routers(app: FastAPI) -> None:
         category_router,
         expense_router,
         payment_router,
+        receipt_router,
     )
     from app.garden.router import router as garden_router
     from app.harvest.router import router as harvest_router
@@ -104,6 +104,7 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(expense_router)
     app.include_router(payment_router)
     app.include_router(balance_router)
+    app.include_router(receipt_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():
@@ -115,4 +116,3 @@ def setup_routers(app: FastAPI) -> None:
 
 
 app = create_app()
-

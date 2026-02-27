@@ -16,14 +16,14 @@ const auth = useAuthStore();
       <span>Garten</span>
     </v-btn>
 
+    <v-btn to="/finance" value="finance">
+      <v-icon>mdi-cash-register</v-icon>
+      <span>Finanzen</span>
+    </v-btn>
+
     <v-btn to="/harvest" value="harvest">
       <v-icon>mdi-basket</v-icon>
       <span>Ernte</span>
-    </v-btn>
-
-    <v-btn to="/watering" value="watering">
-      <v-icon>mdi-water</v-icon>
-      <span>Gießen</span>
     </v-btn>
 
     <v-btn v-if="auth.isAdmin" to="/admin" value="admin">
@@ -32,4 +32,3 @@ const auth = useAuthStore();
     </v-btn>
   </v-bottom-navigation>
 </template>
-
