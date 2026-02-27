@@ -172,11 +172,3 @@ text
 4. **Keine Abkürzungen.** Vollständiger, produktionsreifer Code.
 5. **Erkläre Architekturentscheidungen** kurz in 1-2 Sätzen wenn nötig.
 6. **Frage nach** wenn etwas unklar ist, statt Annahmen zu treffen.
-
----
-
-## Los geht's!
-
-Starte mit **Phase 1, Schritt 1**: Docker Compose Setup.
-Zeige mir die Dateistruktur und die docker-compose.yml, Dockerfiles,
-und die Apache-Config. Warte dann auf mein OK bevor du weitermachst.
