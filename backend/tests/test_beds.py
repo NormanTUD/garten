@@ -255,7 +255,7 @@ async def test_create_planting(client: AsyncClient, admin_user):
             "bed_id": bed_id,
             "plant_id": plant_id,
             "planted_at": "2026-03-15",
-            "expected_harvest": "2026-07-01",
+            "expected_harvest_date": "2026-07-01",
             "status": "active",
             "notes": "Reihe 1",
         },

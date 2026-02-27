@@ -11,10 +11,12 @@ class Bed(Base):
     __tablename__ = "beds"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    garden_id: Mapped[int] = mapped_column(Integer, ForeignKey("gardens.id", ondelete="CASCADE"), nullable=False, index=True)
+    garden_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("gardens.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    geometry: Mapped[str | None] = mapped_column(Text, nullable=True)  # GeoJSON string
+    geometry: Mapped[str | None] = mapped_column(Text, nullable=True)
     area_sqm: Mapped[float | None] = mapped_column(Float, nullable=True)
     soil_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     sun_exposure: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -34,7 +36,6 @@ class Bed(Base):
 
     @property
     def geometry_dict(self) -> dict | None:
-        """Parse GeoJSON string to dict."""
         if self.geometry is None:
             return None
         return json.loads(self.geometry)
@@ -44,10 +45,14 @@ class BedPlanting(Base):
     __tablename__ = "bed_plantings"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    bed_id: Mapped[int] = mapped_column(Integer, ForeignKey("beds.id", ondelete="CASCADE"), nullable=False, index=True)
-    plant_id: Mapped[int] = mapped_column(Integer, ForeignKey("plants.id", ondelete="CASCADE"), nullable=False, index=True)
+    bed_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("beds.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    plant_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("plants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     planted_at: Mapped[date | None] = mapped_column(Date, nullable=True)
-    expected_harvest: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expected_harvest_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

@@ -87,7 +87,7 @@ def upgrade() -> None:
         sa.Column("garden_id", sa.Integer(), nullable=False),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("geometry", sa.Text(), nullable=True),  # GeoJSON string
+        sa.Column("geometry", sa.Text(), nullable=True),
         sa.Column("area_sqm", sa.Float(), nullable=True),
         sa.Column("soil_type", sa.String(50), nullable=True),
         sa.Column("sun_exposure", sa.String(20), nullable=True),
@@ -111,8 +111,8 @@ def upgrade() -> None:
         sa.Column("category", sa.String(50), nullable=True),
         sa.Column("icon", sa.String(50), nullable=True),
         sa.Column("expected_water_needs", sa.String(20), nullable=True),
-        sa.Column("growing_season_start", sa.Integer(), nullable=True),  # month 1-12
-        sa.Column("growing_season_end", sa.Integer(), nullable=True),  # month 1-12
+        sa.Column("growing_season_start", sa.Integer(), nullable=True),
+        sa.Column("growing_season_end", sa.Integer(), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
             "created_at",
@@ -123,14 +123,14 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
-    # Bed plantings (which plant is in which bed)
+    # Bed plantings
     op.create_table(
         "bed_plantings",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("bed_id", sa.Integer(), nullable=False),
         sa.Column("plant_id", sa.Integer(), nullable=False),
         sa.Column("planted_at", sa.Date(), nullable=True),
-        sa.Column("expected_harvest", sa.Date(), nullable=True),
+        sa.Column("expected_harvest_date", sa.Date(), nullable=True),
         sa.Column("status", sa.String(20), nullable=False, server_default="active"),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(

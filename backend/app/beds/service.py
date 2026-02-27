@@ -23,7 +23,6 @@ async def get_bed_by_id(db: AsyncSession, bed_id: int) -> Bed | None:
 
 async def create_bed(db: AsyncSession, data: BedCreate) -> Bed:
     bed_data = data.model_dump()
-    # Serialize GeoJSON dict to string for storage
     if bed_data.get("geometry") is not None:
         bed_data["geometry"] = json.dumps(bed_data["geometry"])
     bed = Bed(**bed_data)
@@ -53,7 +52,9 @@ async def delete_bed(db: AsyncSession, bed: Bed) -> None:
 
 async def get_plantings_by_bed(db: AsyncSession, bed_id: int) -> list[BedPlanting]:
     result = await db.execute(
-        select(BedPlanting).where(BedPlanting.bed_id == bed_id).order_by(BedPlanting.created_at.desc())
+        select(BedPlanting)
+        .where(BedPlanting.bed_id == bed_id)
+        .order_by(BedPlanting.created_at.desc())
     )
     return list(result.scalars().all())
 

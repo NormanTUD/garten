@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,7 +9,7 @@ class BedCreate(BaseModel):
     garden_id: int
     name: str = Field(..., min_length=1, max_length=100)
     description: str | None = None
-    geometry: dict | None = None  # GeoJSON object from Leaflet
+    geometry: dict | None = None
     area_sqm: float | None = Field(default=None, ge=0)
     soil_type: str | None = Field(default=None, max_length=50)
     sun_exposure: str | None = Field(default=None, pattern=r"^(full_sun|partial_shade|full_shade)$")
@@ -33,7 +31,7 @@ class BedRead(BaseModel):
     garden_id: int
     name: str
     description: str | None
-    geometry: dict | None  # Parsed from JSON string
+    geometry: dict | None
     area_sqm: float | None
     soil_type: str | None
     sun_exposure: str | None
@@ -46,14 +44,14 @@ class BedPlantingCreate(BaseModel):
     bed_id: int
     plant_id: int
     planted_at: date | None = None
-    expected_harvest: date | None = None
+    expected_harvest_date: date | None = None
     status: str = Field(default="active", pattern=r"^(active|harvested|removed)$")
     notes: str | None = None
 
 
 class BedPlantingUpdate(BaseModel):
     planted_at: date | None = None
-    expected_harvest: date | None = None
+    expected_harvest_date: date | None = None
     status: str | None = Field(default=None, pattern=r"^(active|harvested|removed)$")
     notes: str | None = None
 
@@ -74,7 +72,7 @@ class BedPlantingRead(BaseModel):
     plant_id: int
     plant: PlantSummary
     planted_at: date | None
-    expected_harvest: date | None
+    expected_harvest_date: date | None
     status: str
     notes: str | None
     created_at: datetime
