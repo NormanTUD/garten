@@ -102,3 +102,48 @@ class MemberPayment(Base):
     user: Mapped["User"] = relationship(foreign_keys=[user_id], lazy="selectin")  # noqa: F821
     for_user: Mapped["User | None"] = relationship(foreign_keys=[for_user_id], lazy="selectin")  # noqa: F821
 
+class StandingOrder(Base):
+    """Recurring payment commitment from a member (e.g. SEPA direct debit).
+
+    Example: "I pay 50€/month via SEPA starting 2026-01-01"
+    Each month is auto-counted as paid unless an admin marks it as skipped.
+    """
+    __tablename__ = "standing_orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    valid_from: Mapped[date] = mapped_column(Date, nullable=False)
+    valid_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    user: Mapped["User"] = relationship(lazy="selectin")  # noqa: F821
+    skips: Mapped[list["StandingOrderSkip"]] = relationship(
+        back_populates="standing_order", lazy="selectin", cascade="all, delete-orphan"
+    )
+
+
+class StandingOrderSkip(Base):
+    """Marks a month where a standing order was NOT paid."""
+    __tablename__ = "standing_order_skips"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    standing_order_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("standing_orders.id", ondelete="CASCADE"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    standing_order: Mapped["StandingOrder"] = relationship(back_populates="skips")
+

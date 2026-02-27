@@ -160,26 +160,30 @@ class MemberBalance(BaseModel):
     user_id: int
     display_name: str
     total_paid_cents: int
-    share_recurring_cents: int    # Anteil laufende Kosten
-    share_onetime_cents: int      # Anteil Einmal-Ausgaben
-    share_total_cents: int        # Gesamt-Soll
-    remaining_cents: int          # share_total - paid
+    total_standing_order_cents: int  # NEU
+    total_income_cents: int          # NEU: paid + standing orders
+    share_recurring_cents: int
+    share_onetime_cents: int
+    share_total_cents: int
+    remaining_cents: int
 
 
 class GardenFundOverview(BaseModel):
     # Laufende Kosten
     total_recurring_monthly_cents: int
     total_recurring_yearly_cents: int
-    total_recurring_annual_cents: int       # monthly*12 + yearly
+    total_recurring_annual_cents: int
 
     # Einmal-Ausgaben
     total_onetime_expenses_cents: int
 
     # Gesamt
-    total_costs_annual_cents: int           # recurring_annual + onetime
+    total_costs_annual_cents: int
 
     # Zahlungen
     total_payments_cents: int
+    total_standing_order_cents: int  # NEU
+    total_income_cents: int          # NEU: payments + standing orders
     fund_balance_cents: int
 
     # Pro Mitglied
@@ -191,3 +195,69 @@ class GardenFundOverview(BaseModel):
     member_count: int
     member_balances: list[MemberBalance]
 
+
+# ─── Standing Order ────────────────────────────────────────────────
+
+class StandingOrderCreate(BaseModel):
+    user_id: int | None = None  # None = self, admin can set for others
+    amount_cents: int = Field(..., gt=0)
+    description: str | None = Field(default=None, max_length=500)
+    valid_from: date
+    valid_to: date | None = None
+    notes: str | None = None
+
+
+class StandingOrderUpdate(BaseModel):
+    amount_cents: int | None = Field(default=None, gt=0)
+    description: str | None = Field(default=None, max_length=500)
+    valid_from: date | None = None
+    valid_to: date | None = None
+    is_active: bool | None = None
+    notes: str | None = None
+
+
+class StandingOrderSkipCreate(BaseModel):
+    year: int
+    month: int = Field(..., ge=1, le=12)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class StandingOrderSkipRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    standing_order_id: int
+    year: int
+    month: int
+    reason: str | None
+
+
+class StandingOrderRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    user_id: int
+    user: UserSummary
+    amount_cents: int
+    description: str | None
+    valid_from: date
+    valid_to: date | None
+    is_active: bool
+    notes: str | None
+    skips: list[StandingOrderSkipRead]
+    created_at: datetime
+
+
+class StandingOrderMonthStatus(BaseModel):
+    """Status of a standing order for a specific month."""
+    month: int
+    month_name: str
+    amount_cents: int
+    is_paid: bool  # True unless skipped
+    skip_reason: str | None = None
+
+
+class StandingOrderYearSummary(BaseModel):
+    """Summary of a standing order for a full year."""
+    standing_order: StandingOrderRead
+    months: list[StandingOrderMonthStatus]
+    total_paid_cents: int
+    total_skipped_cents: int

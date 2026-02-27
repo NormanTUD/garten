@@ -103,10 +103,47 @@ def upgrade() -> None:
     op.create_index("ix_member_payments_for_user_id", "member_payments", ["for_user_id"])
     op.create_index("ix_member_payments_payment_date", "member_payments", ["payment_date"])
 
+    # Standing orders (recurring payments from members, e.g. SEPA direct debit)
+    op.create_table(
+        "standing_orders",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column("amount_cents", sa.Integer(), nullable=False),
+        sa.Column("description", sa.String(500), nullable=True),
+        sa.Column("valid_from", sa.Date(), nullable=False),
+        sa.Column("valid_to", sa.Date(), nullable=True),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("notes", sa.Text(), nullable=True),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False,
+            server_default=sa.func.now(),
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+    )
+    op.create_index("ix_standing_orders_user_id", "standing_orders", ["user_id"])
+
+    # Skipped months for standing orders (admin marks "not paid this month")
+    op.create_table(
+        "standing_order_skips",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("standing_order_id", sa.Integer(), nullable=False),
+        sa.Column("year", sa.Integer(), nullable=False),
+        sa.Column("month", sa.Integer(), nullable=False),
+        sa.Column("reason", sa.String(500), nullable=True),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), nullable=False,
+            server_default=sa.func.now(),
+        ),
+        sa.PrimaryKeyConstraint("id"),
+        sa.ForeignKeyConstraint(["standing_order_id"], ["standing_orders.id"], ondelete="CASCADE"),
+        sa.UniqueConstraint("standing_order_id", "year", "month", name="uq_skip_order_month"),
+    )
 
 def downgrade() -> None:
+    op.drop_table("standing_order_skips")
+    op.drop_table("standing_orders")
     op.drop_table("member_payments")
     op.drop_table("garden_expenses")
     op.drop_table("recurring_costs")
     op.drop_table("expense_categories")
-

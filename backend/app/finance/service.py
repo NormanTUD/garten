@@ -15,6 +15,8 @@ from app.finance.schemas import (
     RecurringCostUpdate,
 )
 
+from app.finance.models import StandingOrder, StandingOrderSkip
+from app.finance.schemas import StandingOrderCreate, StandingOrderUpdate, StandingOrderSkipCreate
 
 # ─── Categories ────────────────────────────────────────────────────
 
@@ -235,4 +237,62 @@ async def update_payment(
 async def delete_payment(db: AsyncSession, payment: MemberPayment) -> None:
     await db.delete(payment)
     await db.flush()
+
+# ─── Standing Orders ──────────────────────────────────────────────
+
+async def get_all_standing_orders(
+    db: AsyncSession, user_id: int | None = None, active_only: bool = True
+) -> list[StandingOrder]:
+    stmt = select(StandingOrder).order_by(StandingOrder.user_id, StandingOrder.valid_from)
+    if user_id is not None:
+        stmt = stmt.where(StandingOrder.user_id == user_id)
+    if active_only:
+        stmt = stmt.where(StandingOrder.is_active.is_(True))
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_standing_order_by_id(db: AsyncSession, order_id: int) -> StandingOrder | None:
+    result = await db.execute(select(StandingOrder).where(StandingOrder.id == order_id))
+    return result.scalar_one_or_none()
+
+
+async def create_standing_order(db: AsyncSession, user_id: int, data: StandingOrderCreate) -> StandingOrder:
+    order_data = data.model_dump(exclude={"user_id"})
+    order = StandingOrder(user_id=user_id, **order_data)
+    db.add(order)
+    await db.flush()
+    await db.refresh(order)
+    return order
+
+
+async def update_standing_order(
+    db: AsyncSession, order: StandingOrder, data: StandingOrderUpdate
+) -> StandingOrder:
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(order, field, value)
+    await db.flush()
+    await db.refresh(order)
+    return order
+
+
+async def delete_standing_order(db: AsyncSession, order: StandingOrder) -> None:
+    await db.delete(order)
+    await db.flush()
+
+
+async def add_skip(db: AsyncSession, order_id: int, data: StandingOrderSkipCreate) -> StandingOrderSkip:
+    skip = StandingOrderSkip(standing_order_id=order_id, **data.model_dump())
+    db.add(skip)
+    await db.flush()
+    await db.refresh(skip)
+    return skip
+
+
+async def remove_skip(db: AsyncSession, skip_id: int) -> None:
+    result = await db.execute(select(StandingOrderSkip).where(StandingOrderSkip.id == skip_id))
+    skip = result.scalar_one_or_none()
+    if skip:
+        await db.delete(skip)
+        await db.flush()
 
