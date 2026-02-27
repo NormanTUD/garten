@@ -24,7 +24,13 @@ from app.finance.schemas import (
     RecurringCostCreate,
     RecurringCostRead,
     RecurringCostUpdate,
+    StandingOrderCreate,
+    StandingOrderRead,
+    StandingOrderSkipCreate,
+    StandingOrderSkipRead,
+    StandingOrderUpdate,
 )
+
 
 category_router = APIRouter(prefix="/api/finance/categories", tags=["finance"])
 recurring_router = APIRouter(prefix="/api/finance/recurring", tags=["finance"])
@@ -308,4 +314,75 @@ async def get_receipt(filename: str, user: CurrentUser):
     if not file_path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
     return FileResponse(file_path)
+
+
+standing_router = APIRouter(prefix="/api/finance/standing-orders", tags=["finance"])
+
+
+# ─── Standing Orders ──────────────────────────────────────────────
+
+@standing_router.get("/", response_model=list[StandingOrderRead])
+async def list_standing_orders(
+    user: CurrentUser, db: DBSession,
+    user_id: int | None = Query(default=None),
+):
+    return await service.get_all_standing_orders(db, user_id=user_id)
+
+
+@standing_router.post("/", response_model=StandingOrderRead, status_code=status.HTTP_201_CREATED)
+async def create_standing_order(
+    data: StandingOrderCreate, user: CurrentUser, db: DBSession
+):
+    """Create a standing order. Users create for themselves, admin can create for others."""
+    target_user_id = data.user_id or user.id
+    if target_user_id != user.id and user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Only admin can create standing orders for other users")
+    order = await service.create_standing_order(db, target_user_id, data)
+    await db.refresh(order)
+    return order
+
+
+@standing_router.patch("/{order_id}", response_model=StandingOrderRead)
+async def update_standing_order(
+    order_id: int, data: StandingOrderUpdate, user: CurrentUser, db: DBSession
+):
+    order = await service.get_standing_order_by_id(db, order_id)
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Standing order not found")
+    if order.user_id != user.id and user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Only admin or owner can edit standing orders")
+    updated = await service.update_standing_order(db, order, data)
+    await db.refresh(updated)
+    return updated
+
+
+@standing_router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_standing_order(order_id: int, user: AdminUser, db: DBSession):
+    order = await service.get_standing_order_by_id(db, order_id)
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Standing order not found")
+    await service.delete_standing_order(db, order)
+
+
+@standing_router.post("/{order_id}/skip", response_model=StandingOrderSkipRead, status_code=status.HTTP_201_CREATED)
+async def skip_month(order_id: int, data: StandingOrderSkipCreate, user: AdminUser, db: DBSession):
+    """Admin marks a month as not paid for a standing order."""
+    order = await service.get_standing_order_by_id(db, order_id)
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Standing order not found")
+    try:
+        skip = await service.add_skip(db, order_id, data)
+        return skip
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"Month {data.year}-{data.month:02d} already skipped")
+
+
+@standing_router.delete("/{order_id}/skip/{skip_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def unskip_month(order_id: int, skip_id: int, user: AdminUser, db: DBSession):
+    """Admin removes a skip (marks month as paid again)."""
+    await service.remove_skip(db, skip_id)
 

@@ -65,9 +65,9 @@ def setup_routers(app: FastAPI) -> None:
     from app.auth.router import router as auth_router
     from app.auth.router import user_router
     from app.beds.router import planting_router, router as beds_router
-    from app.finance.router import (
+        from app.finance.router import (
         category_router, recurring_router, expense_router,
-        payment_router, fund_router, receipt_router,
+        payment_router, fund_router, receipt_router, standing_router,
     )
     from app.garden.router import router as garden_router
     from app.harvest.router import router as harvest_router
@@ -90,6 +90,7 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(payment_router)
     app.include_router(fund_router)
     app.include_router(receipt_router)
+    app.include_router(standing_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():

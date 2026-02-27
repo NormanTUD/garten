@@ -15,7 +15,11 @@ from app.beds.models import Bed, BedPlanting  # noqa: F401
 from app.plants.models import Plant  # noqa: F401
 from app.harvest.models import Harvest  # noqa: F401
 from app.watering.models import FertilizingEvent, WateringEvent  # noqa: F401
-from app.finance.models import ExpenseCategory, RecurringCost, GardenExpense, MemberPayment  # noqa: F401
+from app.finance.models import (
+    ExpenseCategory, RecurringCost, GardenExpense, MemberPayment,
+    StandingOrder, StandingOrderSkip,
+)  # noqa: F401
+
 
 config = context.config
 if config.config_file_name is not None:
