@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column("amount", sa.Float(), nullable=False),
         sa.Column("unit", sa.String(20), nullable=False),
         sa.Column("quality_rating", sa.Integer(), nullable=True),
-        sa.Column("date", sa.Date(), nullable=False),
+        sa.Column("harvest_date", sa.Date(), nullable=False),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
             "created_at",
@@ -43,7 +43,7 @@ def upgrade() -> None:
     op.create_index("ix_harvests_user_id", "harvests", ["user_id"])
     op.create_index("ix_harvests_bed_id", "harvests", ["bed_id"])
     op.create_index("ix_harvests_plant_id", "harvests", ["plant_id"])
-    op.create_index("ix_harvests_date", "harvests", ["date"])
+    op.create_index("ix_harvests_harvest_date", "harvests", ["harvest_date"])
 
     # Watering events
     op.create_table(
@@ -85,7 +85,7 @@ def upgrade() -> None:
         sa.Column("fertilizer_type", sa.String(100), nullable=False),
         sa.Column("amount", sa.Float(), nullable=True),
         sa.Column("unit", sa.String(20), nullable=True),
-        sa.Column("date", sa.Date(), nullable=False),
+        sa.Column("event_date", sa.Date(), nullable=False),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
             "created_at",
@@ -99,7 +99,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_fertilizing_events_user_id", "fertilizing_events", ["user_id"])
     op.create_index("ix_fertilizing_events_bed_id", "fertilizing_events", ["bed_id"])
-    op.create_index("ix_fertilizing_events_date", "fertilizing_events", ["date"])
+    op.create_index("ix_fertilizing_events_event_date", "fertilizing_events", ["event_date"])
 
 
 def downgrade() -> None:

@@ -83,16 +83,16 @@ async def get_all_fertilizing_events(
     limit: int = 100,
     offset: int = 0,
 ) -> list[FertilizingEvent]:
-    stmt = select(FertilizingEvent).order_by(FertilizingEvent.date.desc())
+    stmt = select(FertilizingEvent).order_by(FertilizingEvent.event_date.desc())
 
     if bed_id is not None:
         stmt = stmt.where(FertilizingEvent.bed_id == bed_id)
     if user_id is not None:
         stmt = stmt.where(FertilizingEvent.user_id == user_id)
     if date_from is not None:
-        stmt = stmt.where(FertilizingEvent.date >= date_from)
+        stmt = stmt.where(FertilizingEvent.event_date >= date_from)
     if date_to is not None:
-        stmt = stmt.where(FertilizingEvent.date <= date_to)
+        stmt = stmt.where(FertilizingEvent.event_date <= date_to)
 
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)
@@ -114,6 +114,7 @@ async def create_fertilizing_event(
     await db.flush()
     await db.refresh(event)
     return event
+
 
 async def update_fertilizing_event(
     db: AsyncSession, event: FertilizingEvent, data: FertilizingEventUpdate

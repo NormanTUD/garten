@@ -22,7 +22,7 @@ class Harvest(Base):
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False)
     quality_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    harvest_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

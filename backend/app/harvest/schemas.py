@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -11,7 +9,7 @@ class HarvestCreate(BaseModel):
     amount: float = Field(..., gt=0)
     unit: str = Field(..., pattern=r"^(kg|g|stueck|bund|liter|eimer)$")
     quality_rating: int | None = Field(default=None, ge=1, le=5)
-    date: date
+    harvest_date: date
     notes: str | None = None
 
 
@@ -21,7 +19,7 @@ class HarvestUpdate(BaseModel):
     amount: float | None = Field(default=None, gt=0)
     unit: str | None = Field(default=None, pattern=r"^(kg|g|stueck|bund|liter|eimer)$")
     quality_rating: int | None = Field(default=None, ge=1, le=5)
-    date: date | None = None
+    harvest_date: date | None = None
     notes: str | None = None
 
 
@@ -57,7 +55,7 @@ class HarvestRead(BaseModel):
     amount: float
     unit: str
     quality_rating: int | None
-    date: date
+    harvest_date: date
     notes: str | None
     created_at: datetime
 

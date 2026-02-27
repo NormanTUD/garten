@@ -18,7 +18,7 @@ async def get_all_harvests(
     limit: int = 100,
     offset: int = 0,
 ) -> list[Harvest]:
-    stmt = select(Harvest).order_by(Harvest.date.desc(), Harvest.created_at.desc())
+    stmt = select(Harvest).order_by(Harvest.harvest_date.desc(), Harvest.created_at.desc())
 
     if bed_id is not None:
         stmt = stmt.where(Harvest.bed_id == bed_id)
@@ -27,9 +27,9 @@ async def get_all_harvests(
     if user_id is not None:
         stmt = stmt.where(Harvest.user_id == user_id)
     if date_from is not None:
-        stmt = stmt.where(Harvest.date >= date_from)
+        stmt = stmt.where(Harvest.harvest_date >= date_from)
     if date_to is not None:
-        stmt = stmt.where(Harvest.date <= date_to)
+        stmt = stmt.where(Harvest.harvest_date <= date_to)
 
     stmt = stmt.offset(offset).limit(limit)
     result = await db.execute(stmt)

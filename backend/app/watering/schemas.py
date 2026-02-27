@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -80,7 +78,7 @@ class FertilizingEventCreate(BaseModel):
     fertilizer_type: str = Field(..., min_length=1, max_length=100)
     amount: float | None = Field(default=None, gt=0)
     unit: str | None = Field(default=None, pattern=r"^(kg|g|l|ml|stueck)$")
-    date: date
+    event_date: date
     notes: str | None = None
 
 
@@ -89,7 +87,7 @@ class FertilizingEventUpdate(BaseModel):
     fertilizer_type: str | None = Field(default=None, min_length=1, max_length=100)
     amount: float | None = Field(default=None, gt=0)
     unit: str | None = Field(default=None, pattern=r"^(kg|g|l|ml|stueck)$")
-    date: date | None = None
+    event_date: date | None = None
     notes: str | None = None
 
 
@@ -104,7 +102,7 @@ class FertilizingEventRead(BaseModel):
     fertilizer_type: str
     amount: float | None
     unit: str | None
-    date: date
+    event_date: date
     notes: str | None
     created_at: datetime
 

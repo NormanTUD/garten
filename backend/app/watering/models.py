@@ -35,7 +35,6 @@ class WateringEvent(Base):
         server_default=func.now(),
     )
 
-    # Relationships
     user: Mapped["User"] = relationship(lazy="selectin")  # noqa: F821
     bed: Mapped["Bed | None"] = relationship(lazy="selectin")  # noqa: F821
 
@@ -53,7 +52,7 @@ class FertilizingEvent(Base):
     fertilizer_type: Mapped[str] = mapped_column(String(100), nullable=False)
     amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    event_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -61,7 +60,6 @@ class FertilizingEvent(Base):
         server_default=func.now(),
     )
 
-    # Relationships
     user: Mapped["User"] = relationship(lazy="selectin")  # noqa: F821
     bed: Mapped["Bed | None"] = relationship(lazy="selectin")  # noqa: F821
 
