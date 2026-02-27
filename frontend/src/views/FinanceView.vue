@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { api } from "@/api/client";
 import { useAuthStore } from "@/stores/auth";
 import PhotoCapture from "@/components/shared/PhotoCapture.vue";
@@ -80,6 +80,17 @@ interface FundOverview {
 const tab = ref("expenses");
 const loading = ref(true);
 
+const selectedYear = ref(new Date().getFullYear());
+
+const yearOptions = computed(() => {
+  const current = new Date().getFullYear();
+  const years = [];
+  for (let y = current - 5; y <= current + 2; y++) {
+    years.push(y);
+  }
+  return years;
+});
+
 const categories = ref<Category[]>([]);
 const recurring = ref<RecurringCost[]>([]);
 const expenses = ref<GardenExpense[]>([]);
@@ -140,15 +151,23 @@ const myBalance = computed(() => {
 
 onMounted(() => loadAll());
 
+watch(selectedYear, () => loadAll());
+
 async function loadAll() {
   loading.value = true;
   try {
     const [cats, rec, exps, pays, f] = await Promise.all([
       api.get<Category[]>("/finance/categories/"),
       api.get<RecurringCost[]>("/finance/recurring/"),
-      api.get<GardenExpense[]>("/finance/expenses/"),
-      api.get<MemberPayment[]>("/finance/payments/"),
-      api.get<FundOverview>("/finance/fund/"),
+      api.get<GardenExpense[]>("/finance/expenses/", {
+        date_from: `${selectedYear.value}-01-01`,
+        date_to: `${selectedYear.value}-12-31`,
+      }),
+      api.get<MemberPayment[]>("/finance/payments/", {
+        date_from: `${selectedYear.value}-01-01`,
+        date_to: `${selectedYear.value}-12-31`,
+      }),
+      api.get<FundOverview>("/finance/fund/", { year: selectedYear.value }),
     ]);
     categories.value = cats;
     recurring.value = rec;
@@ -156,7 +175,6 @@ async function loadAll() {
     payments.value = pays;
     fund.value = f;
 
-    // Extract users from balance (works for all users)
     users.value = f.member_balances.map((b) => ({
       id: b.user_id,
       username: "",
@@ -313,6 +331,28 @@ async function deleteRecurring(id: number) {
 <template>
   <div>
     <h1 class="text-h4 mb-2">Gartenkasse</h1>
+    <div class="d-flex align-center mb-2 flex-wrap ga-2">
+      <h1 class="text-h4">Gartenkasse</h1>
+      <v-spacer />
+      <v-btn-toggle
+        v-model="selectedYear"
+        mandatory
+        color="primary"
+        density="compact"
+        variant="outlined"
+      >
+        <v-btn
+          v-for="y in yearOptions"
+          :key="y"
+          :value="y"
+          size="small"
+          :variant="y === selectedYear ? 'flat' : 'outlined'"
+        >
+          {{ y }}
+        </v-btn>
+      </v-btn-toggle>
+    </div>
+
 
     <v-skeleton-loader v-if="loading" type="card@2" />
 
