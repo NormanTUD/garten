@@ -4,10 +4,12 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.auth.schemas import UserCreate
+from app.auth.service import create_user
+from app.auth.utils import create_access_token
 from app.database import Base, get_async_session
 from app.main import create_app
 
-# In-memory SQLite for tests – fast, isolated, no cleanup needed
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 test_engine = create_async_engine(
@@ -51,4 +53,45 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+@pytest.fixture
+async def admin_user():
+    """Create an admin user in the test DB and return (user, token)."""
+    async with test_session_factory() as session:
+        user = await create_user(
+            session,
+            UserCreate(
+                username="testadmin",
+                password="admin123",
+                display_name="Test Admin",
+                role="admin",
+            ),
+        )
+        await session.commit()
+        token = create_access_token(user.id, user.role)
+        return user, token
+
+
+@pytest.fixture
+async def normal_user():
+    """Create a normal user in the test DB and return (user, token)."""
+    async with test_session_factory() as session:
+        user = await create_user(
+            session,
+            UserCreate(
+                username="testuser",
+                password="user1234",
+                display_name="Test User",
+                role="user",
+            ),
+        )
+        await session.commit()
+        token = create_access_token(user.id, user.role)
+        return user, token
+
+
+def auth_header(token: str) -> dict[str, str]:
+    """Helper to create Authorization header."""
+    return {"Authorization": f"Bearer {token}"}
 
