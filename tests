@@ -2,3 +2,4 @@
 
 docker compose up -d --build
 docker compose exec backend pytest tests/ -v
+docker compose exec frontend npx vitest run
