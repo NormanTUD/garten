@@ -32,6 +32,7 @@ interface GardenExpense {
   amount_cents: number;
   description: string;
   expense_date: string;
+  is_shared: boolean;
   receipt_image_path: string | null;
   notes: string | null;
 }
@@ -39,6 +40,8 @@ interface GardenExpense {
 interface MemberPayment {
   id: number;
   user: { id: number; display_name: string };
+  for_user: { id: number; display_name: string } | null;
+  for_user_id: number | null;
   amount_cents: number;
   payment_type: string;
   description: string | null;
@@ -100,6 +103,7 @@ const showPaymentDialog = ref(false);
 const paymentForm = ref({
   amount: null as number | null,
   payment_type: "cash",
+  for_user_id: null as number | null,
   description: "",
   payment_date: new Date().toISOString().split("T")[0],
   receipt_image_path: null as string | null,
@@ -144,6 +148,13 @@ async function loadAll() {
     expenses.value = exps;
     payments.value = pays;
     fund.value = f;
+
+    // Extract users from balance (works for all users)
+    users.value = f.member_balances.map((b) => ({
+      id: b.user_id,
+      username: "",
+      display_name: b.display_name,
+    }));
   } finally {
     loading.value = false;
   }
@@ -220,6 +231,7 @@ async function saveExpense() {
   await loadAll();
 }
 
+
 async function deleteExpense(id: number) {
   await api.delete(`/finance/expenses/${id}`);
   await loadAll();
@@ -231,6 +243,7 @@ function openPaymentDialog() {
   paymentForm.value = {
     amount: null,
     payment_type: "cash",
+    for_user_id: null,
     description: "",
     payment_date: new Date().toISOString().split("T")[0],
     receipt_image_path: null,
@@ -246,6 +259,7 @@ async function savePayment() {
     payment_type: paymentForm.value.payment_type,
     payment_date: paymentForm.value.payment_date,
   };
+  if (paymentForm.value.for_user_id) data.for_user_id = paymentForm.value.for_user_id;
   if (paymentForm.value.description) data.description = paymentForm.value.description;
   if (paymentForm.value.receipt_image_path) data.receipt_image_path = paymentForm.value.receipt_image_path;
 
@@ -597,6 +611,10 @@ async function deleteRecurring(id: number) {
                 <v-chip v-if="e.category" size="x-small" class="ml-2" variant="tonal">
                   {{ e.category.icon || "" }} {{ e.category.name }}
                 </v-chip>
+		<v-chip v-if="!e.is_shared" size="x-small" class="ml-1" color="warning" variant="flat">
+                  nicht umgelegt
+                </v-chip>
+
               </template>
 
               <template #subtitle>
@@ -637,11 +655,14 @@ async function deleteRecurring(id: number) {
                 </v-avatar>
               </template>
 
-              <template #title>
-                <span class="font-weight-bold">{{ p.user.display_name }}</span>
-                <v-chip size="x-small" class="ml-2" variant="tonal">
-                  {{ paymentTypeLabel(p.payment_type) }}
+	      <template #title>
+                <span class="font-weight-bold">
+                  {{ p.for_user ? p.for_user.display_name : p.user.display_name }}
+                </span>
+                <v-chip v-if="p.for_user && p.for_user.id !== p.user.id" size="x-small" class="ml-1" variant="tonal">
+                  eingetragen von {{ p.user.display_name }}
                 </v-chip>
+
                 <v-chip
                   v-if="p.confirmed_by_admin"
                   size="x-small"
@@ -849,6 +870,22 @@ async function deleteRecurring(id: number) {
               variant="outlined"
               density="comfortable"
               class="mb-3 text-h5"
+            />
+
+            <!-- Admin: für wen? -->
+            <v-select
+              v-if="auth.isAdmin"
+              v-model="paymentForm.for_user_id"
+              label="Einzahlung für"
+              :items="users"
+              item-title="display_name"
+              item-value="id"
+              clearable
+              variant="outlined"
+              density="comfortable"
+              class="mb-3"
+              hint="Leer = für dich selbst"
+              persistent-hint
             />
 
             <v-btn-toggle
