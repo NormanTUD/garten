@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import async_session_factory, create_all_tables
+from app.middleware.audit_log import AuditLogMiddleware
 
 logger = logging.getLogger("gartenapp")
 
@@ -66,6 +67,9 @@ def setup_logging() -> None:
 
 
 def setup_middleware(app: FastAPI) -> None:
+    # Audit log middleware (outermost = runs first)
+    app.add_middleware(AuditLogMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.debug else [],
@@ -77,11 +81,13 @@ def setup_middleware(app: FastAPI) -> None:
 
 def setup_routers(app: FastAPI) -> None:
     """Register all API routers."""
+    from app.audit.router import router as audit_router
     from app.auth.router import router as auth_router
     from app.auth.router import user_router
 
     app.include_router(auth_router)
     app.include_router(user_router)
+    app.include_router(audit_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():
