@@ -237,4 +237,222 @@ async def test_delete_watering_event_not_found(client: AsyncClient, admin_user):
 
 async def test_normal_user_can_create_watering_event(client: AsyncClient, normal_user):
     _, token = normal_user
+    response = await client.post(
+        "/api/watering/",
+        headers=auth_header(token),
+        json={"started_at": "2026-07-15T08:00:00Z", "duration_minutes": 20},
+    )
+    assert response.status_code == 201
+    assert response.json()["user"]["display_name"] == "Test User"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Fertilizing Events
+# ═══════════════════════════════════════════════════════════════════
+
+# ─── Create ───────────────────────────────────────────────────────
+
+async def test_create_fertilizing_event(client: AsyncClient, admin_user):
+    _, token = admin_user
+    garden_id = await _create_garden(client, token)
+    bed_id = await _create_bed(client, token, garden_id)
+
+    response = await client.post(
+        "/api/fertilizing/",
+        headers=auth_header(token),
+        json={
+            "bed_id": bed_id,
+            "fertilizer_type": "Kompost",
+            "amount": 5.0,
+            "unit": "kg",
+            "event_date": "2026-04-10",
+            "notes": "Frühjahrsdüngung",
+        },
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["fertilizer_type"] == "Kompost"
+    assert data["amount"] == 5.0
+    assert data["unit"] == "kg"
+    assert data["event_date"] == "2026-04-10"
+    assert data["user"]["display_name"] == "Test Admin"
+    assert data["bed"]["name"] == "Beet 1"
+
+
+async def test_create_fertilizing_event_minimal(client: AsyncClient, admin_user):
+    _, token = admin_user
+    response = await client.post(
+        "/api/fertilizing/",
+        headers=auth_header(token),
+        json={"fertilizer_type": "Hornspäne", "event_date": "2026-04-10"},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["bed"] is None
+    assert data["amount"] is None
+    assert data["unit"] is None
+
+
+async def test_create_fertilizing_event_invalid_unit(client: AsyncClient, admin_user):
+    _, token = admin_user
+    response = await client.post(
+        "/api/fertilizing/",
+        headers=auth_header(token),
+        json={"fertilizer_type": "Test", "event_date": "2026-04-10", "unit": "tonnen"},
+    )
+    assert response.status_code == 422
+
+
+async def test_create_fertilizing_event_invalid_bed(client: AsyncClient, admin_user):
+    _, token = admin_user
+    response = await client.post(
+        "/api/fertilizing/",
+        headers=auth_header(token),
+        json={"bed_id": 9999, "fertilizer_type": "Test", "event_date": "2026-04-10"},
+    )
+    assert response.status_code == 404
+
+
+async def test_create_fertilizing_event_unauthenticated(client: AsyncClient):
+    response = await client.post(
+        "/api/fertilizing/",
+        json={"fertilizer_type": "Test", "event_date": "2026-04-10"},
+    )
+    assert response.status_code == 401
+
+
+# ─── List ─────────────────────────────────────────────────────────
+
+async def test_list_fertilizing_events(client: AsyncClient, admin_user):
+    _, token = admin_user
+    await client.post(
+        "/api/fertilizing/", headers=auth_header(token),
+        json={"fertilizer_type": "Kompost", "event_date": "2026-04-10"},
+    )
+    await client.post(
+        "/api/fertilizing/", headers=auth_header(token),
+        json={"fertilizer_type": "Hornspäne", "event_date": "2026-05-15"},
+    )
+
+    response = await client.get("/api/fertilizing/", headers=auth_header(token))
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 2
+    assert data[0]["event_date"] == "2026-05-15"
+    assert data[1]["event_date"] == "2026-04-10"
+
+
+async def test_list_fertilizing_events_filter_by_bed(client: AsyncClient, admin_user):
+    _, token = admin_user
+    garden_id = await _create_garden(client, token)
+    bed_id = await _create_bed(client, token, garden_id)
+
+    await client.post(
+        "/api/fertilizing/", headers=auth_header(token),
+        json={"bed_id": bed_id, "fertilizer_type": "Kompost", "event_date": "2026-04-10"},
+    )
+    await client.post(
+        "/api/fertilizing/", headers=auth_header(token),
+        json={"fertilizer_type": "Hornspäne", "event_date": "2026-04-10"},
+    )
+
+    response = await client.get(
+        "/api/fertilizing/", headers=auth_header(token), params={"bed_id": bed_id}
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+
+
+async def test_list_fertilizing_events_empty(client: AsyncClient, admin_user):
+    _, token = admin_user
+    response = await client.get("/api/fertilizing/", headers=auth_header(token))
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+# ─── Get ──────────────────────────────────────────────────────────
+
+async def test_get_fertilizing_event(client: AsyncClient, admin_user):
+    _, token = admin_user
+    create_resp = await client.post(
+        "/api/fertilizing/", headers=auth_header(token),
+        json={"fertilizer_type": "Kompost", "event_date": "2026-04-10"},
+    )
+    event_id = create_resp.json()["id"]
+
+    response = await client.get(f"/api/fertilizing/{event_id}", headers=auth_header(token))
+    assert response.status_code == 200
+    assert response.json()["id"] == event_id
+
+
+async def test_get_fertilizing_event_not_found(client: AsyncClient, admin_user):
+    _, token = admin_user
+    response = await client.get("/api/fertilizing/9999", headers=auth_header(token))
+    assert response.status_code == 404
+
+
+# ─── Update ───────────────────────────────────────────────────────
+
+async def test_update_fertilizing_event(client: AsyncClient, admin_user):
+    _, token = admin_user
+    create_resp = await client.post(
+        "/api/fertilizing/", headers=auth_header(token),
+        json={"fertilizer_type": "Kompost", "event_date": "2026-04-10"},
+    )
+    event_id = create_resp.json()["id"]
+
+    response = await client.patch(
+        f"/api/fertilizing/{event_id}",
+        headers=auth_header(token),
+        json={"amount": 10, "unit": "l", "notes": "Flüssigdünger"},
+    )
+    assert response.status_code == 200
+    assert response.json()["amount"] == 10
+    assert response.json()["unit"] == "l"
+    assert response.json()["notes"] == "Flüssigdünger"
+
+
+async def test_update_fertilizing_event_not_found(client: AsyncClient, admin_user):
+    _, token = admin_user
+    response = await client.patch(
+        "/api/fertilizing/9999", headers=auth_header(token),
+        json={"fertilizer_type": "Ghost"},
+    )
+    assert response.status_code == 404
+
+
+# ─── Delete ───────────────────────────────────────────────────────
+
+async def test_delete_fertilizing_event(client: AsyncClient, admin_user):
+    _, token = admin_user
+    create_resp = await client.post(
+        "/api/fertilizing/", headers=auth_header(token),
+        json={"fertilizer_type": "Kompost", "event_date": "2026-04-10"},
+    )
+    event_id = create_resp.json()["id"]
+
+    response = await client.delete(f"/api/fertilizing/{event_id}", headers=auth_header(token))
+    assert response.status_code == 204
+
+    get_resp = await client.get(f"/api/fertilizing/{event_id}", headers=auth_header(token))
+    assert get_resp.status_code == 404
+
+
+async def test_delete_fertilizing_event_not_found(client: AsyncClient, admin_user):
+    _, token = admin_user
+    response = await client.delete("/api/fertilizing/9999", headers=auth_header(token))
+    assert response.status_code == 404
+
+
+# ─── Normal user ──────────────────────────────────────────────────
+
+async def test_normal_user_can_create_fertilizing_event(client: AsyncClient, normal_user):
+    _, token = normal_user
+    response = await client.post(
+        "/api/fertilizing/",
+        headers=auth_header(token),
+        json={"fertilizer_type": "Biodünger", "event_date": "2026-04-10"},
+    )
+    assert response.status_code == 201
+    assert response.json()["user"]["display_name"] == "Test User"
 
