@@ -28,17 +28,16 @@ class AccessTokenResponse(BaseModel):
 # --- User ---
 
 class UserCreate(BaseModel):
-    username: str = Field(..., min_length=2, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$")
-    password: str = Field(..., min_length=6, max_length=128)
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=6, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=100)
     role: str = Field(default="user", pattern=r"^(admin|user)$")
-
 
 class UserUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
     role: str | None = Field(default=None, pattern=r"^(admin|user)$")
     is_active: bool | None = None
-
+    password: str | None = Field(default=None, min_length=6, max_length=100)
 
 class PasswordChange(BaseModel):
     current_password: str = Field(..., min_length=4, max_length=128)

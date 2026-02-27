@@ -86,14 +86,15 @@ async def list_users(admin: AdminUser, db: DBSession):
 
 @user_router.post("/", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def create_user(data: UserCreate, admin: AdminUser, db: DBSession):
-    existing = await service.get_user_by_username(db, data.username)
+    """Admin creates a new user."""
+    existing = await get_user_by_username(db, data.username)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Username already exists",
+            detail=f"Username '{data.username}' already exists",
         )
-    return await service.create_user(db, data)
-
+    user = await create_user_in_db(db, data)
+    return user
 
 @user_router.get("/{user_id}", response_model=UserRead)
 async def get_user(user_id: int, admin: AdminUser, db: DBSession):
@@ -105,11 +106,35 @@ async def get_user(user_id: int, admin: AdminUser, db: DBSession):
 
 @user_router.patch("/{user_id}", response_model=UserRead)
 async def update_user(user_id: int, data: UserUpdate, admin: AdminUser, db: DBSession):
-    user = await service.get_user_by_id(db, user_id)
+    """Admin updates a user. Cannot deactivate admins or self."""
+    user = await get_user_by_id(db, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return await service.update_user(db, user, data)
 
+    # Prevent deactivating yourself
+    if data.is_active is False and user.id == admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot deactivate yourself",
+        )
+
+    # Prevent deactivating other admins
+    if data.is_active is False and user.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin accounts cannot be deactivated",
+        )
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        if field == "password" and value is not None:
+            from app.auth.security import hash_password
+            setattr(user, "password_hash", hash_password(value))
+        elif field != "password":
+            setattr(user, field, value)
+
+    await db.flush()
+    await db.refresh(user)
+    return user
 
 @user_router.put("/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
 async def admin_reset_password(
