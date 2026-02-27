@@ -21,6 +21,8 @@ interface RecurringCost {
   description: string;
   amount_cents: number;
   interval: string;
+  valid_from: string;
+  valid_to: string | null;
   is_active: boolean;
   notes: string | null;
 }
@@ -133,6 +135,8 @@ const recurringForm = ref({
   description: "",
   amount: null as number | null,
   interval: "monthly",
+  valid_from: `${new Date().getFullYear()}-01-01`,
+  valid_to: "",
   notes: "",
 });
 
@@ -158,7 +162,7 @@ async function loadAll() {
   try {
     const [cats, rec, exps, pays, f] = await Promise.all([
       api.get<Category[]>("/finance/categories/"),
-      api.get<RecurringCost[]>("/finance/recurring/"),
+      api.get<RecurringCost[]>("/finance/recurring/", { year: selectedYear.value }),
       api.get<GardenExpense[]>("/finance/expenses/", {
         date_from: `${selectedYear.value}-01-01`,
         date_to: `${selectedYear.value}-12-31`,
@@ -306,18 +310,29 @@ async function deletePayment(id: number) {
 // ─── Recurring Cost Actions ───────────────────────────────────────
 
 function openRecurringDialog() {
-  recurringForm.value = { description: "", amount: null, interval: "monthly", notes: "" };
+  recurringForm.value = {
+    description: "",
+    amount: null,
+    interval: "monthly",
+    valid_from: `${selectedYear.value}-01-01`,
+    valid_to: "",
+    notes: "",
+  };
   showRecurringDialog.value = true;
 }
 
 async function saveRecurring() {
   if (!recurringForm.value.amount || !recurringForm.value.description) return;
-  await api.post("/finance/recurring/", {
+  const data: any = {
     description: recurringForm.value.description,
     amount_cents: Math.round(recurringForm.value.amount * 100),
     interval: recurringForm.value.interval,
-    notes: recurringForm.value.notes || undefined,
-  });
+    valid_from: recurringForm.value.valid_from,
+  };
+  if (recurringForm.value.valid_to) data.valid_to = recurringForm.value.valid_to;
+  if (recurringForm.value.notes) data.notes = recurringForm.value.notes;
+
+  await api.post("/finance/recurring/", data);
   showRecurringDialog.value = false;
   await loadAll();
 }
@@ -448,6 +463,10 @@ async function deleteRecurring(id: number) {
                     <td>
                       {{ r.description }}
                       <span v-if="r.notes" class="text-caption text-medium-emphasis ml-1">({{ r.notes }})</span>
+                      <div class="text-caption text-medium-emphasis">
+                        {{ new Date(r.valid_from).toLocaleDateString('de-DE') }}
+                        {{ r.valid_to ? '– ' + new Date(r.valid_to).toLocaleDateString('de-DE') : '– unbegrenzt' }}
+                      </div>
                     </td>
                     <td class="text-right text-medium-emphasis">{{ eur(r.amount_cents) }} / Monat</td>
                     <td class="text-right font-weight-bold">{{ eur(r.amount_cents) }}</td>
@@ -456,6 +475,7 @@ async function deleteRecurring(id: number) {
                       <v-btn size="x-small" icon="mdi-delete" variant="text" color="error" density="compact" @click="deleteRecurring(r.id)" />
                     </td>
                   </tr>
+
 
                   <!-- Zwischensumme monatlich -->
                   <tr v-if="recurring.filter(r => r.interval === 'monthly').length > 0" class="bg-grey-lighten-4">
@@ -466,12 +486,24 @@ async function deleteRecurring(id: number) {
                   </tr>
 
                   <!-- Jährliche Posten -->
-                  <tr v-if="recurring.filter(r => r.interval === 'yearly').length > 0" class="bg-grey-lighten-5">
-                    <td colspan="5" class="text-caption font-weight-bold text-medium-emphasis py-1">
-                      Jährliche Kosten
+		  <tr v-for="r in recurring.filter(r => r.interval === 'yearly')" :key="'y-' + r.id">
+                    <td>
+                      {{ r.description }}
+                      <span v-if="r.notes" class="text-caption text-medium-emphasis ml-1">({{ r.notes }})</span>
+                      <div class="text-caption text-medium-emphasis">
+                        {{ new Date(r.valid_from).toLocaleDateString('de-DE') }}
+                        {{ r.valid_to ? '– ' + new Date(r.valid_to).toLocaleDateString('de-DE') : '– unbegrenzt' }}
+                      </div>
+                    </td>
+                    <td class="text-right text-medium-emphasis">{{ eur(r.amount_cents) }} / Jahr</td>
+                    <td class="text-right">{{ eur(Math.round(r.amount_cents / 12)) }}</td>
+                    <td class="text-right font-weight-bold">{{ eur(r.amount_cents) }}</td>
+                    <td v-if="auth.isAdmin" class="text-right">
+                      <v-btn size="x-small" icon="mdi-delete" variant="text" color="error" density="compact" @click="deleteRecurring(r.id)" />
                     </td>
                   </tr>
-                  <tr v-for="r in recurring.filter(r => r.interval === 'yearly')" :key="'y-' + r.id">
+
+	          <tr v-for="r in recurring.filter(r => r.interval === 'yearly')" :key="'y-' + r.id">
                     <td>
                       {{ r.description }}
                       <span v-if="r.notes" class="text-caption text-medium-emphasis ml-1">({{ r.notes }})</span>
@@ -1126,7 +1158,7 @@ async function deleteRecurring(id: number) {
       </v-card>
     </v-dialog>
 
-    <!-- ═══ Recurring Cost Dialog (Admin) ══════════════════════ -->
+        <!-- ═══ Recurring Cost Dialog (Admin) ══════════════════════ -->
     <v-dialog v-model="showRecurringDialog" max-width="500">
       <v-card>
         <v-card-title>Laufende Kosten anlegen</v-card-title>
@@ -1135,7 +1167,7 @@ async function deleteRecurring(id: number) {
             <v-text-field
               v-model="recurringForm.description"
               label="Beschreibung *"
-              placeholder="z.B. Pacht, Wasser, Versicherung"
+              placeholder="z.B. Strom, Pacht, Wasser"
               autofocus
               variant="outlined"
               density="comfortable"
@@ -1166,12 +1198,36 @@ async function deleteRecurring(id: number) {
               <v-btn value="yearly">Jährlich</v-btn>
             </v-btn-toggle>
 
+            <v-row dense class="mb-3">
+              <v-col cols="6">
+                <v-text-field
+                  v-model="recurringForm.valid_from"
+                  label="Gültig ab *"
+                  type="date"
+                  variant="outlined"
+                  density="comfortable"
+                />
+              </v-col>
+              <v-col cols="6">
+                <v-text-field
+                  v-model="recurringForm.valid_to"
+                  label="Gültig bis"
+                  type="date"
+                  variant="outlined"
+                  density="comfortable"
+                  hint="Leer = unbegrenzt"
+                  persistent-hint
+                />
+              </v-col>
+            </v-row>
+
             <v-textarea
               v-model="recurringForm.notes"
               label="Notizen"
               rows="2"
               variant="outlined"
               density="comfortable"
+              placeholder="z.B. Preiserhöhung ab 2026"
             />
           </v-form>
         </v-card-text>
@@ -1188,6 +1244,7 @@ async function deleteRecurring(id: number) {
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </div>
+
+      </div>
 </template>
 

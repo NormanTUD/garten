@@ -72,13 +72,22 @@ async def update_category(
 
 # ─── Recurring Costs ──────────────────────────────────────────────
 
-async def get_all_recurring_costs(db: AsyncSession, active_only: bool = True) -> list[RecurringCost]:
-    stmt = select(RecurringCost).order_by(RecurringCost.description)
+async def get_all_recurring_costs(
+    db: AsyncSession, active_only: bool = True, year: int | None = None
+) -> list[RecurringCost]:
+    stmt = select(RecurringCost).order_by(RecurringCost.description, RecurringCost.valid_from)
     if active_only:
         stmt = stmt.where(RecurringCost.is_active.is_(True))
+    if year is not None:
+        year_start = date(year, 1, 1)
+        year_end = date(year, 12, 31)
+        # valid_from <= year_end AND (valid_to IS NULL OR valid_to >= year_start)
+        stmt = stmt.where(RecurringCost.valid_from <= year_end)
+        stmt = stmt.where(
+            (RecurringCost.valid_to.is_(None)) | (RecurringCost.valid_to >= year_start)
+        )
     result = await db.execute(stmt)
     return list(result.scalars().all())
-
 
 async def get_recurring_cost_by_id(db: AsyncSession, cost_id: int) -> RecurringCost | None:
     result = await db.execute(select(RecurringCost).where(RecurringCost.id == cost_id))

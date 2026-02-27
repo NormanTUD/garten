@@ -68,9 +68,12 @@ async def update_category(category_id: int, data: ExpenseCategoryUpdate, user: C
 
 @recurring_router.get("/", response_model=list[RecurringCostRead])
 async def list_recurring_costs(
-    user: CurrentUser, db: DBSession, active_only: bool = Query(default=True)
+    user: CurrentUser,
+    db: DBSession,
+    active_only: bool = Query(default=True),
+    year: int | None = Query(default=None),
 ):
-    return await service.get_all_recurring_costs(db, active_only=active_only)
+    return await service.get_all_recurring_costs(db, active_only=active_only, year=year)
 
 
 @recurring_router.post("/", response_model=RecurringCostRead, status_code=status.HTTP_201_CREATED)

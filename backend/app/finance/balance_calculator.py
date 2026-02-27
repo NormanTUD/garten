@@ -8,6 +8,20 @@ from app.finance.models import GardenExpense, MemberPayment, RecurringCost
 from app.finance.schemas import GardenFundOverview, MemberBalance
 
 
+def _months_active_in_year(valid_from: date, valid_to: date | None, year: int) -> int:
+    """Calculate how many months a recurring cost is active in a given year."""
+    year_start = date(year, 1, 1)
+    year_end = date(year, 12, 31)
+
+    start = max(valid_from, year_start)
+    end = min(valid_to, year_end) if valid_to else year_end
+
+    if start > end:
+        return 0
+
+    return (end.month - start.month + 1) + (end.year - start.year) * 12
+
+
 async def calculate_fund_overview(
     db: AsyncSession,
     year: int | None = None,
@@ -18,17 +32,34 @@ async def calculate_fund_overview(
     year_start = date(year, 1, 1)
     year_end = date(year, 12, 31)
 
-    # ─── Recurring costs ───────────────────────────────────────
+    # ─── Recurring costs active in this year ───────────────────
     recurring_result = await db.execute(
-        select(RecurringCost).where(RecurringCost.is_active.is_(True))
+        select(RecurringCost)
+        .where(RecurringCost.is_active.is_(True))
+        .where(RecurringCost.valid_from <= year_end)
+        .where(
+            (RecurringCost.valid_to.is_(None)) | (RecurringCost.valid_to >= year_start)
+        )
     )
     recurring_costs = list(recurring_result.scalars().all())
 
-    total_monthly = sum(c.amount_cents for c in recurring_costs if c.interval == "monthly")
-    total_yearly = sum(c.amount_cents for c in recurring_costs if c.interval == "yearly")
-    total_recurring_annual = (total_monthly * 12) + total_yearly
+    # Calculate annual totals considering validity periods
+    total_monthly_base = 0  # Sum of monthly amounts (for display: "current monthly")
+    total_from_monthly = 0  # Actual annual cost from monthly items
+    total_from_yearly = 0   # Actual annual cost from yearly items
 
-    # ─── One-time expenses this year (ONLY shared ones) ────────
+    for cost in recurring_costs:
+        months = _months_active_in_year(cost.valid_from, cost.valid_to, year)
+        if cost.interval == "monthly":
+            total_monthly_base += cost.amount_cents
+            total_from_monthly += cost.amount_cents * months
+        elif cost.interval == "yearly":
+            # Yearly cost counts fully if active any time in the year
+            total_from_yearly += cost.amount_cents
+
+    total_recurring_annual = total_from_monthly + total_from_yearly
+
+    # ─── One-time expenses this year (only shared) ─────────────
     onetime_result = await db.execute(
         select(func.coalesce(func.sum(GardenExpense.amount_cents), 0))
         .where(GardenExpense.expense_date >= year_start)
@@ -47,13 +78,12 @@ async def calculate_fund_overview(
     member_count = len(members) or 1
 
     share_recurring_annual = total_recurring_annual // member_count
-    share_recurring_monthly = share_recurring_annual // 12
+    share_recurring_monthly = share_recurring_annual // 12 if total_recurring_annual > 0 else 0
     share_onetime = total_onetime // member_count
     share_total_annual = total_costs_annual // member_count
-    share_total_monthly = share_total_annual // 12
+    share_total_monthly = share_total_annual // 12 if total_costs_annual > 0 else 0
 
-    # ─── Payments this year per member (use for_user_id) ───────
-    # Payments are credited to for_user_id (the beneficiary)
+    # ─── Payments this year per member ─────────────────────────
     payments_result = await db.execute(
         select(MemberPayment.for_user_id, func.coalesce(func.sum(MemberPayment.amount_cents), 0))
         .where(MemberPayment.payment_date >= year_start)
@@ -62,7 +92,6 @@ async def calculate_fund_overview(
         .group_by(MemberPayment.for_user_id)
     )
     payments_map = dict(payments_result.all())
-
     total_payments = sum(payments_map.values())
 
     # ─── Per-member balance ────────────────────────────────────
@@ -86,8 +115,8 @@ async def calculate_fund_overview(
     fund_balance = total_payments - total_onetime
 
     return GardenFundOverview(
-        total_recurring_monthly_cents=total_monthly,
-        total_recurring_yearly_cents=total_yearly,
+        total_recurring_monthly_cents=total_monthly_base,
+        total_recurring_yearly_cents=total_from_yearly,
         total_recurring_annual_cents=total_recurring_annual,
         total_onetime_expenses_cents=total_onetime,
         total_costs_annual_cents=total_costs_annual,
