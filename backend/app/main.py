@@ -24,7 +24,6 @@ async def lifespan(app: FastAPI):
         await create_all_tables()
         logger.info("Database tables created (debug mode)")
 
-    # Seed initial admin user
     from app.auth.service import ensure_admin_exists
 
     async with async_session_factory() as session:
@@ -39,15 +38,8 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down %s", settings.app_name)
 
 
-def create_app(
-    audit_session_factory=None,
-) -> FastAPI:
-    """Application factory.
-
-    Args:
-        audit_session_factory: Optional session factory for audit middleware.
-                               Used in tests to inject the test DB session.
-    """
+def create_app(audit_session_factory=None) -> FastAPI:
+    """Application factory."""
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -74,9 +66,7 @@ def setup_logging() -> None:
 
 
 def setup_middleware(app: FastAPI, audit_session_factory=None) -> None:
-    # Audit log middleware (outermost = runs first)
     app.add_middleware(AuditLogMiddleware, session_factory=audit_session_factory)
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.debug else [],
@@ -91,10 +81,17 @@ def setup_routers(app: FastAPI) -> None:
     from app.audit.router import router as audit_router
     from app.auth.router import router as auth_router
     from app.auth.router import user_router
+    from app.beds.router import planting_router, router as beds_router
+    from app.garden.router import router as garden_router
+    from app.plants.router import router as plants_router
 
     app.include_router(auth_router)
     app.include_router(user_router)
     app.include_router(audit_router)
+    app.include_router(garden_router)
+    app.include_router(beds_router)
+    app.include_router(planting_router)
+    app.include_router(plants_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():

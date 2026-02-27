@@ -63,10 +63,11 @@ async def delete_bed(bed_id: int, user: CurrentUser, db: DBSession):
     await service.delete_bed(db, bed)
 
 
-def _bed_to_read(bed: "Bed") -> dict:
+def _bed_to_read(bed) -> dict:
     """Convert Bed model to read schema, parsing geometry JSON."""
     import json
-    data = {
+
+    return {
         "id": bed.id,
         "garden_id": bed.garden_id,
         "name": bed.name,
@@ -77,7 +78,7 @@ def _bed_to_read(bed: "Bed") -> dict:
         "sun_exposure": bed.sun_exposure,
         "created_at": bed.created_at,
     }
-    return data
+
 
 # ─── Bed Plantings ────────────────────────────────────────────────
 
@@ -99,7 +100,6 @@ async def create_planting(data: BedPlantingCreate, user: CurrentUser, db: DBSess
     if plant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plant not found")
     planting = await service.create_planting(db, data)
-    # Refresh to load plant relationship
     await db.refresh(planting)
     return planting
 
