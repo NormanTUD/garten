@@ -341,6 +341,120 @@ async function deleteRecurring(id: number) {
           </v-row>
         </v-card-text>
 
+        <!-- Kostenaufstellung (aufklappbar) -->
+        <v-divider />
+        <v-expansion-panels variant="accordion" flat>
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <v-icon icon="mdi-calculator" size="small" class="mr-2" />
+              <span class="text-body-2">So setzt sich "Pro Person/Monat" zusammen</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <!-- Laufende monatliche Kosten -->
+              <div class="text-subtitle-2 font-weight-bold mb-2">
+                <v-icon icon="mdi-repeat" size="small" class="mr-1" />
+                Laufende Kosten
+              </div>
+
+              <div v-if="recurring.length === 0" class="text-body-2 text-grey mb-3">
+                Keine laufenden Kosten eingetragen.
+              </div>
+
+              <v-table v-else density="compact" class="mb-3">
+                <thead>
+                  <tr>
+                    <th>Posten</th>
+                    <th class="text-right">Betrag</th>
+                    <th class="text-right">Intervall</th>
+                    <th class="text-right">Pro Jahr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="r in recurring" :key="r.id">
+                    <td>{{ r.description }}</td>
+                    <td class="text-right">{{ eur(r.amount_cents) }}</td>
+                    <td class="text-right">{{ intervalLabel(r.interval) }}</td>
+                    <td class="text-right font-weight-bold">
+                      {{ eur(r.interval === "monthly" ? r.amount_cents * 12 : r.amount_cents) }}
+                    </td>
+                  </tr>
+                  <tr class="bg-grey-lighten-4">
+                    <td colspan="3" class="font-weight-bold">Summe laufende Kosten / Jahr</td>
+                    <td class="text-right font-weight-bold">{{ eur(fund.total_recurring_annual_cents) }}</td>
+                  </tr>
+                </tbody>
+              </v-table>
+
+              <!-- Einzelposten dieses Jahr -->
+              <div class="text-subtitle-2 font-weight-bold mb-2">
+                <v-icon icon="mdi-receipt" size="small" class="mr-1" />
+                Einzelposten ({{ new Date().getFullYear() }})
+              </div>
+
+              <div v-if="fund.total_onetime_expenses_cents === 0" class="text-body-2 text-grey mb-3">
+                Keine Einzelposten dieses Jahr.
+              </div>
+
+              <v-table v-else density="compact" class="mb-3">
+                <thead>
+                  <tr>
+                    <th>Datum</th>
+                    <th>Posten</th>
+                    <th>Von</th>
+                    <th class="text-right">Betrag</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="e in expenses" :key="e.id">
+                    <td>{{ new Date(e.expense_date).toLocaleDateString("de-DE") }}</td>
+                    <td>
+                      {{ e.description }}
+                      <v-chip v-if="e.category" size="x-small" class="ml-1" variant="tonal">
+                        {{ e.category.icon || "" }} {{ e.category.name }}
+                      </v-chip>
+                    </td>
+                    <td>{{ e.user.display_name }}</td>
+                    <td class="text-right font-weight-bold">{{ eur(e.amount_cents) }}</td>
+                  </tr>
+                  <tr class="bg-grey-lighten-4">
+                    <td colspan="3" class="font-weight-bold">Summe Einzelposten</td>
+                    <td class="text-right font-weight-bold">{{ eur(fund.total_onetime_expenses_cents) }}</td>
+                  </tr>
+                </tbody>
+              </v-table>
+
+              <!-- Gesamtrechnung -->
+              <v-divider class="mb-3" />
+              <v-table density="compact">
+                <tbody>
+                  <tr>
+                    <td>Laufende Kosten / Jahr</td>
+                    <td class="text-right">{{ eur(fund.total_recurring_annual_cents) }}</td>
+                  </tr>
+                  <tr>
+                    <td>+ Einzelposten {{ new Date().getFullYear() }}</td>
+                    <td class="text-right">{{ eur(fund.total_onetime_expenses_cents) }}</td>
+                  </tr>
+                  <tr class="bg-primary-lighten-5">
+                    <td class="font-weight-bold text-primary">= Gesamtkosten / Jahr</td>
+                    <td class="text-right font-weight-bold text-primary">{{ eur(fund.total_costs_annual_cents) }}</td>
+                  </tr>
+                  <tr>
+                    <td>÷ {{ fund.member_count }} Mitglieder</td>
+                    <td class="text-right">{{ eur(fund.share_per_member_annual_cents) }} / Jahr</td>
+                  </tr>
+                  <tr class="bg-primary-lighten-5">
+                    <td class="font-weight-bold text-primary">= Pro Person / Monat</td>
+                    <td class="text-right font-weight-bold text-primary text-h6">
+                      {{ eur(fund.share_per_member_monthly_cents) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </v-table>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+        </v-expansion-panels>
+
         <!-- All members -->
         <v-divider />
         <v-card-text class="pt-2 pb-3">
