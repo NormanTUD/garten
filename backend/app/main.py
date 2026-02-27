@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import create_all_tables
+from app.database import async_session_factory, create_all_tables
 
 logger = logging.getLogger("gartenapp")
 
@@ -14,23 +14,27 @@ logger = logging.getLogger("gartenapp")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic."""
-    # Startup
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
 
-    # Ensure upload directory exists
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
-
-    # Ensure data directory exists (for SQLite)
     Path("data").mkdir(parents=True, exist_ok=True)
 
-    # Create tables if they don't exist (dev convenience; production uses Alembic)
     if settings.debug:
         await create_all_tables()
         logger.info("Database tables created (debug mode)")
 
+    # Seed initial admin user
+    from app.auth.service import ensure_admin_exists
+
+    async with async_session_factory() as session:
+        await ensure_admin_exists(
+            session,
+            settings.first_admin_username,
+            settings.first_admin_password,
+        )
+
     yield
 
-    # Shutdown
     logger.info("Shutting down %s", settings.app_name)
 
 
@@ -72,7 +76,12 @@ def setup_middleware(app: FastAPI) -> None:
 
 
 def setup_routers(app: FastAPI) -> None:
-    """Register all API routers. New modules are added here."""
+    """Register all API routers."""
+    from app.auth.router import router as auth_router
+    from app.auth.router import user_router
+
+    app.include_router(auth_router)
+    app.include_router(user_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():
@@ -83,5 +92,4 @@ def setup_routers(app: FastAPI) -> None:
         }
 
 
-# Create the app instance (used by uvicorn)
 app = create_app()
