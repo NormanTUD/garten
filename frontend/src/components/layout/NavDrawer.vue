@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import { useDisplay } from "vuetify";
 
 const auth = useAuthStore();
 const rail = ref(false);
+const { mdAndUp } = useDisplay();
 
 const navItems = [
   { title: "Dashboard", icon: "mdi-view-dashboard", to: "/" },
@@ -20,9 +22,9 @@ const adminItems = [
 
 <template>
   <v-navigation-drawer
+    v-if="mdAndUp"
     :rail="rail"
     permanent
-    class="d-none d-md-block"
     @click="rail = false"
   >
     <v-list density="compact" nav>
@@ -61,4 +63,3 @@ const adminItems = [
     </template>
   </v-navigation-drawer>
 </template>
-
