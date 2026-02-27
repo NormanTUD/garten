@@ -1,95 +1,99 @@
+from datetime import date
+
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
-from app.finance.models import Expense, ExpenseSplit, Payment
-from app.finance.schemas import BalanceOverview, UserBalance
+from app.finance.models import GardenExpense, MemberPayment, RecurringCost
+from app.finance.schemas import GardenFundOverview, MemberBalance
 
 
-async def calculate_balance(db: AsyncSession) -> BalanceOverview:
-    """Calculate the financial balance for all active users.
+async def calculate_fund_overview(
+    db: AsyncSession,
+    year: int | None = None,
+) -> GardenFundOverview:
+    """Calculate the garden fund overview.
 
-    For each user:
-    - total_paid = sum of expenses they created (they paid for the group)
-    - total_share = sum of their splits (what they owe in total)
-    - total_sent = sum of payments they sent to others
-    - total_received = sum of payments they received from others
-
-    balance = (total_paid - total_share) - total_received + total_sent
-
-    Why this formula:
-    - (total_paid - total_share) = net credit from expenses
-      If you paid 1000 but only owe 500, you have +500 credit
-    - Receiving a payment SETTLES your credit (reduces it): - total_received
-    - Sending a payment SETTLES your debt (reduces it): + total_sent
-
-    Positive balance = others still owe you money
-    Negative balance = you still owe others money
+    Costs = recurring (monthly*12 + yearly) + one-time expenses
+    Each member's share = total annual costs / number of active members
+    Each member's remaining = share - what they've paid
     """
-    # Get all active users
-    result = await db.execute(
+    if year is None:
+        year = date.today().year
+
+    year_start = date(year, 1, 1)
+    year_end = date(year, 12, 31)
+
+    # ─── Recurring costs ───────────────────────────────────────
+    recurring_result = await db.execute(
+        select(RecurringCost).where(RecurringCost.is_active.is_(True))
+    )
+    recurring_costs = list(recurring_result.scalars().all())
+
+    total_monthly = sum(c.amount_cents for c in recurring_costs if c.interval == "monthly")
+    total_yearly = sum(c.amount_cents for c in recurring_costs if c.interval == "yearly")
+    total_recurring_annual = (total_monthly * 12) + total_yearly
+
+    # ─── One-time expenses this year ───────────────────────────
+    onetime_result = await db.execute(
+        select(func.coalesce(func.sum(GardenExpense.amount_cents), 0))
+        .where(GardenExpense.expense_date >= year_start)
+        .where(GardenExpense.expense_date <= year_end)
+    )
+    total_onetime = onetime_result.scalar() or 0
+
+    total_costs_annual = total_recurring_annual + total_onetime
+
+    # ─── Active members ────────────────────────────────────────
+    members_result = await db.execute(
         select(User).where(User.is_active.is_(True)).order_by(User.display_name)
     )
-    users = list(result.scalars().all())
+    members = list(members_result.scalars().all())
+    member_count = len(members) or 1  # Avoid division by zero
 
-    # Total paid per user (expenses they created)
-    paid_result = await db.execute(
-        select(Expense.user_id, func.coalesce(func.sum(Expense.amount_cents), 0))
-        .group_by(Expense.user_id)
+    share_per_member_annual = total_costs_annual // member_count
+    share_per_member_monthly = share_per_member_annual // 12
+
+    # ─── Payments this year per member ─────────────────────────
+    payments_result = await db.execute(
+        select(MemberPayment.user_id, func.coalesce(func.sum(MemberPayment.amount_cents), 0))
+        .where(MemberPayment.payment_date >= year_start)
+        .where(MemberPayment.payment_date <= year_end)
+        .group_by(MemberPayment.user_id)
     )
-    paid_map = dict(paid_result.all())
+    payments_map = dict(payments_result.all())
 
-    # Total share per user (their splits)
-    share_result = await db.execute(
-        select(ExpenseSplit.user_id, func.coalesce(func.sum(ExpenseSplit.share_amount_cents), 0))
-        .group_by(ExpenseSplit.user_id)
-    )
-    share_map = dict(share_result.all())
+    total_payments = sum(payments_map.values())
 
-    # Total sent per user (payments FROM this user)
-    sent_result = await db.execute(
-        select(Payment.from_user_id, func.coalesce(func.sum(Payment.amount_cents), 0))
-        .group_by(Payment.from_user_id)
-    )
-    sent_map = dict(sent_result.all())
+    # ─── Per-member balance ────────────────────────────────────
+    member_balances = []
+    for member in members:
+        paid = payments_map.get(member.id, 0)
+        remaining = share_per_member_annual - paid
 
-    # Total received per user (payments TO this user)
-    received_result = await db.execute(
-        select(Payment.to_user_id, func.coalesce(func.sum(Payment.amount_cents), 0))
-        .group_by(Payment.to_user_id)
-    )
-    received_map = dict(received_result.all())
-
-    # Total expenses
-    total_result = await db.execute(
-        select(func.coalesce(func.sum(Expense.amount_cents), 0))
-    )
-    total_expenses = total_result.scalar() or 0
-
-    balances = []
-    for user in users:
-        total_paid = paid_map.get(user.id, 0)
-        total_share = share_map.get(user.id, 0)
-        total_sent = sent_map.get(user.id, 0)
-        total_received = received_map.get(user.id, 0)
-
-        # Net credit from expenses, adjusted by payments
-        balance = (total_paid - total_share) - total_received + total_sent
-
-        balances.append(
-            UserBalance(
-                user_id=user.id,
-                display_name=user.display_name,
-                total_paid_cents=total_paid,
-                total_share_cents=total_share,
-                total_received_cents=total_received,
-                total_sent_cents=total_sent,
-                balance_cents=balance,
+        member_balances.append(
+            MemberBalance(
+                user_id=member.id,
+                display_name=member.display_name,
+                total_paid_cents=paid,
+                share_cents=share_per_member_annual,
+                remaining_cents=remaining,
             )
         )
 
-    return BalanceOverview(
-        balances=balances,
-        total_expenses_cents=total_expenses,
+    fund_balance = total_payments - total_onetime
+
+    return GardenFundOverview(
+        total_recurring_monthly_cents=total_monthly,
+        total_recurring_yearly_cents=total_yearly,
+        total_recurring_annual_cents=total_recurring_annual,
+        total_onetime_expenses_cents=total_onetime,
+        total_costs_annual_cents=total_costs_annual,
+        total_payments_cents=total_payments,
+        fund_balance_cents=fund_balance,
+        share_per_member_annual_cents=share_per_member_annual,
+        share_per_member_monthly_cents=share_per_member_monthly,
+        member_count=member_count,
+        member_balances=member_balances,
     )
 

@@ -15,7 +15,6 @@ logger = logging.getLogger("gartenapp")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
-
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
     Path("data").mkdir(parents=True, exist_ok=True)
 
@@ -24,33 +23,22 @@ async def lifespan(app: FastAPI):
         logger.info("Database tables created (debug mode)")
 
     from app.auth.service import ensure_admin_exists
-
     async with async_session_factory() as session:
-        await ensure_admin_exists(
-            session,
-            settings.first_admin_username,
-            settings.first_admin_password,
-        )
+        await ensure_admin_exists(session, settings.first_admin_username, settings.first_admin_password)
 
     yield
-
     logger.info("Shutting down %s", settings.app_name)
 
 
 def create_app(audit_session_factory=None) -> FastAPI:
     app = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        title=settings.app_name, version=settings.app_version,
+        docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json",
         lifespan=lifespan,
     )
-
     setup_logging()
     setup_middleware(app, audit_session_factory=audit_session_factory)
     setup_routers(app)
-
     return app
 
 
@@ -68,10 +56,9 @@ def setup_middleware(app: FastAPI, audit_session_factory=None) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.debug else [],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
     )
+
 
 def setup_routers(app: FastAPI) -> None:
     from app.audit.router import router as audit_router
@@ -79,11 +66,8 @@ def setup_routers(app: FastAPI) -> None:
     from app.auth.router import user_router
     from app.beds.router import planting_router, router as beds_router
     from app.finance.router import (
-        balance_router,
-        category_router,
-        expense_router,
-        payment_router,
-        receipt_router,
+        category_router, recurring_router, expense_router,
+        payment_router, fund_router, receipt_router,
     )
     from app.garden.router import router as garden_router
     from app.harvest.router import router as harvest_router
@@ -101,18 +85,16 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(watering_router)
     app.include_router(fertilizing_router)
     app.include_router(category_router)
+    app.include_router(recurring_router)
     app.include_router(expense_router)
     app.include_router(payment_router)
-    app.include_router(balance_router)
+    app.include_router(fund_router)
     app.include_router(receipt_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():
-        return {
-            "status": "ok",
-            "app": settings.app_name,
-            "version": settings.app_version,
-        }
+        return {"status": "ok", "app": settings.app_name, "version": settings.app_version}
 
 
 app = create_app()
+

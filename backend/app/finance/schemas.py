@@ -11,6 +11,13 @@ class UserSummary(BaseModel):
     display_name: str
 
 
+class CategorySummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    icon: str | None
+
+
 # ─── Expense Category ─────────────────────────────────────────────
 
 class ExpenseCategoryCreate(BaseModel):
@@ -33,60 +40,60 @@ class ExpenseCategoryRead(BaseModel):
     created_at: datetime
 
 
-# ─── Expense Split ─────────────────────────────────────────────────
+# ─── Recurring Cost ────────────────────────────────────────────────
 
-class ExpenseSplitInfo(BaseModel):
-    """Used when creating an expense – specify who pays what."""
-    user_id: int
-    share_amount_cents: int = Field(..., ge=0)
+class RecurringCostCreate(BaseModel):
+    category_id: int | None = None
+    description: str = Field(..., min_length=1, max_length=500)
+    amount_cents: int = Field(..., gt=0)
+    interval: str = Field(..., pattern=r"^(monthly|yearly)$")
+    notes: str | None = None
 
 
-class ExpenseSplitRead(BaseModel):
+class RecurringCostUpdate(BaseModel):
+    category_id: int | None = None
+    description: str | None = Field(default=None, min_length=1, max_length=500)
+    amount_cents: int | None = Field(default=None, gt=0)
+    interval: str | None = Field(default=None, pattern=r"^(monthly|yearly)$")
+    is_active: bool | None = None
+    notes: str | None = None
+
+
+class RecurringCostRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    expense_id: int
-    user_id: int
-    user: UserSummary
-    share_amount_cents: int
-    is_settled: bool
+    category_id: int | None
+    category: CategorySummary | None
+    description: str
+    amount_cents: int
+    interval: str
+    is_active: bool
+    notes: str | None
+    created_at: datetime
 
 
-# ─── Expense ───────────────────────────────────────────────────────
+# ─── Garden Expense ────────────────────────────────────────────────
 
-class ExpenseCreate(BaseModel):
+class GardenExpenseCreate(BaseModel):
     category_id: int | None = None
+    category_name: str | None = None  # Dynamic: if set and not found, create it
     amount_cents: int = Field(..., gt=0)
     description: str = Field(..., min_length=1, max_length=500)
     expense_date: date
-    is_recurring: bool = False
-    recurrence_interval: str | None = Field(
-        default=None, pattern=r"^(monthly|quarterly|yearly)$"
-    )
-    notes: str | None = None
-    splits: list[ExpenseSplitInfo] | None = None  # None = split equally among all active users
-
-
-class ExpenseUpdate(BaseModel):
-    category_id: int | None = None
-    amount_cents: int | None = Field(default=None, gt=0)
-    description: str | None = Field(default=None, min_length=1, max_length=500)
-    expense_date: date | None = None
-    is_recurring: bool | None = None
-    recurrence_interval: str | None = Field(
-        default=None, pattern=r"^(monthly|quarterly|yearly)$"
-    )
     receipt_image_path: str | None = None
     notes: str | None = None
 
 
-class CategorySummary(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    name: str
-    icon: str | None
+class GardenExpenseUpdate(BaseModel):
+    category_id: int | None = None
+    amount_cents: int | None = Field(default=None, gt=0)
+    description: str | None = Field(default=None, min_length=1, max_length=500)
+    expense_date: date | None = None
+    receipt_image_path: str | None = None
+    notes: str | None = None
 
 
-class ExpenseRead(BaseModel):
+class GardenExpenseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     user_id: int
@@ -96,62 +103,72 @@ class ExpenseRead(BaseModel):
     amount_cents: int
     description: str
     expense_date: date
-    is_recurring: bool
-    recurrence_interval: str | None
+    receipt_image_path: str | None
     notes: str | None
-    splits: list[ExpenseSplitRead]
     created_at: datetime
 
 
-# ─── Payment ───────────────────────────────────────────────────────
+# ─── Member Payment ────────────────────────────────────────────────
 
-class PaymentCreate(BaseModel):
-    to_user_id: int
+class MemberPaymentCreate(BaseModel):
     amount_cents: int = Field(..., gt=0)
-    method: str = Field(default="cash", pattern=r"^(cash|transfer|material)$")
+    payment_type: str = Field(..., pattern=r"^(cash|transfer|material)$")
     description: str | None = Field(default=None, max_length=500)
     payment_date: date
+    receipt_image_path: str | None = None
     notes: str | None = None
 
 
-class PaymentUpdate(BaseModel):
+class MemberPaymentUpdate(BaseModel):
     amount_cents: int | None = Field(default=None, gt=0)
-    method: str | None = Field(default=None, pattern=r"^(cash|transfer|material)$")
+    payment_type: str | None = Field(default=None, pattern=r"^(cash|transfer|material)$")
     description: str | None = Field(default=None, max_length=500)
     payment_date: date | None = None
+    receipt_image_path: str | None = None
     confirmed_by_admin: bool | None = None
     notes: str | None = None
 
 
-class PaymentRead(BaseModel):
+class MemberPaymentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    from_user_id: int
-    from_user: UserSummary
-    to_user_id: int
-    to_user: UserSummary
+    user_id: int
+    user: UserSummary
     amount_cents: int
-    method: str
+    payment_type: str
     description: str | None
     payment_date: date
+    receipt_image_path: str | None
     confirmed_by_admin: bool
     notes: str | None
     created_at: datetime
 
 
-# ─── Balance ───────────────────────────────────────────────────────
+# ─── Garden Fund Balance ───────────────────────────────────────────
 
-class UserBalance(BaseModel):
+class MemberBalance(BaseModel):
     user_id: int
     display_name: str
-    total_paid_cents: int       # How much this user paid for the group
-    total_share_cents: int      # How much this user owes in total
-    total_received_cents: int   # Payments received from others
-    total_sent_cents: int       # Payments sent to others
-    balance_cents: int          # Positive = others owe you, Negative = you owe others
+    total_paid_cents: int       # Total payments into the fund
+    share_cents: int            # What this member should pay (total costs / members)
+    remaining_cents: int        # share - paid (positive = still owes, negative = overpaid)
 
 
-class BalanceOverview(BaseModel):
-    balances: list[UserBalance]
-    total_expenses_cents: int
+class GardenFundOverview(BaseModel):
+    # Cost side
+    total_recurring_monthly_cents: int
+    total_recurring_yearly_cents: int
+    total_recurring_annual_cents: int   # monthly*12 + yearly
+    total_onetime_expenses_cents: int
+    total_costs_annual_cents: int       # recurring_annual + onetime (this year)
+
+    # Payment side
+    total_payments_cents: int
+    fund_balance_cents: int             # payments - onetime expenses (how much is in the fund)
+
+    # Per member
+    share_per_member_annual_cents: int  # total_costs_annual / active members
+    share_per_member_monthly_cents: int # share_annual / 12
+    member_count: int
+    member_balances: list[MemberBalance]
 
