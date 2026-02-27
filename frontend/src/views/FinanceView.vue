@@ -376,6 +376,16 @@ async function deleteRecurring(id: number) {
                     <td class="text-right">{{ intervalLabel(r.interval) }}</td>
                     <td class="text-right font-weight-bold">
                       {{ eur(r.interval === "monthly" ? r.amount_cents * 12 : r.amount_cents) }}
+                      <v-btn
+                        v-if="auth.isAdmin"
+                        size="x-small"
+                        icon="mdi-delete"
+                        variant="text"
+                        color="error"
+                        density="compact"
+                        class="ml-1"
+                        @click="deleteRecurring(r.id)"
+                      />
                     </td>
                   </tr>
                   <tr class="bg-grey-lighten-4">
@@ -405,7 +415,7 @@ async function deleteRecurring(id: number) {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="e in expenses" :key="e.id">
+		    <tr v-for="e in expenses" :key="e.id">
                     <td>{{ new Date(e.expense_date).toLocaleDateString("de-DE") }}</td>
                     <td>
                       {{ e.description }}
@@ -414,8 +424,21 @@ async function deleteRecurring(id: number) {
                       </v-chip>
                     </td>
                     <td>{{ e.user.display_name }}</td>
-                    <td class="text-right font-weight-bold">{{ eur(e.amount_cents) }}</td>
+                    <td class="text-right font-weight-bold">
+                      {{ eur(e.amount_cents) }}
+                      <v-btn
+                        v-if="auth.isAdmin"
+                        size="x-small"
+                        icon="mdi-delete"
+                        variant="text"
+                        color="error"
+                        density="compact"
+                        class="ml-1"
+                        @click="deleteExpense(e.id)"
+                      />
+                    </td>
                   </tr>
+
                   <tr class="bg-grey-lighten-4">
                     <td colspan="3" class="font-weight-bold">Summe Einzelposten</td>
                     <td class="text-right font-weight-bold">{{ eur(fund.total_onetime_expenses_cents) }}</td>
@@ -548,7 +571,7 @@ async function deleteRecurring(id: number) {
               <template #append>
                 <div class="text-right">
                   <div class="text-body-1 font-weight-bold text-primary">{{ eur(e.amount_cents) }}</div>
-                  <v-btn size="x-small" icon="mdi-delete" variant="text" color="error" @click="deleteExpense(e.id)" />
+                  <v-btn v-if="auth.isAdmin" size="x-small" icon="mdi-delete" variant="text" color="error" @click="deleteExpense(e.id)" />
                 </div>
               </template>
             </v-list-item>
@@ -611,7 +634,7 @@ async function deleteRecurring(id: number) {
                     >
                       Bestätigen
                     </v-btn>
-                    <v-btn size="x-small" icon="mdi-delete" variant="text" color="error" @click="deletePayment(p.id)" />
+		    <v-btn v-if="auth.isAdmin" size="x-small" icon="mdi-delete" variant="text" color="error" @click="deletePayment(p.id)" />
                   </div>
                 </div>
               </template>
