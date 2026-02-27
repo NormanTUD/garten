@@ -47,6 +47,8 @@ class RecurringCostCreate(BaseModel):
     description: str = Field(..., min_length=1, max_length=500)
     amount_cents: int = Field(..., gt=0)
     interval: str = Field(..., pattern=r"^(monthly|yearly)$")
+    valid_from: date
+    valid_to: date | None = None  # None = unbegrenzt
     notes: str | None = None
 
 
@@ -55,6 +57,8 @@ class RecurringCostUpdate(BaseModel):
     description: str | None = Field(default=None, min_length=1, max_length=500)
     amount_cents: int | None = Field(default=None, gt=0)
     interval: str | None = Field(default=None, pattern=r"^(monthly|yearly)$")
+    valid_from: date | None = None
+    valid_to: date | None = None
     is_active: bool | None = None
     notes: str | None = None
 
@@ -67,10 +71,11 @@ class RecurringCostRead(BaseModel):
     description: str
     amount_cents: int
     interval: str
+    valid_from: date
+    valid_to: date | None
     is_active: bool
     notes: str | None
     created_at: datetime
-
 
 # ─── Garden Expense ────────────────────────────────────────────────
 

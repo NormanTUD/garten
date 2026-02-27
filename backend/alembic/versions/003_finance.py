@@ -40,6 +40,8 @@ def upgrade() -> None:
         sa.Column("description", sa.String(500), nullable=False),
         sa.Column("amount_cents", sa.Integer(), nullable=False),
         sa.Column("interval", sa.String(20), nullable=False),  # monthly, yearly
+        sa.Column("valid_from", sa.Date(), nullable=False),
+        sa.Column("valid_to", sa.Date(), nullable=True),  # NULL = unbegrenzt gültig
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
@@ -49,6 +51,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(["category_id"], ["expense_categories.id"], ondelete="SET NULL"),
     )
+    op.create_index("ix_recurring_costs_valid_from", "recurring_costs", ["valid_from"])
+
 
     # Garden expenses (one-time costs that hit the garden account)
     op.create_table(
