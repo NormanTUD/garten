@@ -77,6 +77,7 @@ class RecurringCostRead(BaseModel):
     notes: str | None
     created_at: datetime
 
+
 # ─── Garden Expense ────────────────────────────────────────────────
 
 class GardenExpenseCreate(BaseModel):

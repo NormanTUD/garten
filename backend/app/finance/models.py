@@ -28,6 +28,11 @@ class ExpenseCategory(Base):
 
 
 class RecurringCost(Base):
+    """Monthly or yearly base costs with validity period.
+
+    Example: Strom 30€/Monat from 2025-01-01 to 2025-12-31,
+             Strom 40€/Monat from 2026-01-01 to None (ongoing).
+    """
     __tablename__ = "recurring_costs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -37,6 +42,8 @@ class RecurringCost(Base):
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     interval: Mapped[str] = mapped_column(String(20), nullable=False)
+    valid_from: Mapped[date] = mapped_column(Date, nullable=False)
+    valid_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
