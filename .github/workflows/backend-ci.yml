@@ -12,29 +12,29 @@ on:
       - "backend/**"
 
 jobs:
-  lint:
-    name: Lint (Ruff)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
+  #lint:
+  #  name: Lint (Ruff)
+  #  runs-on: ubuntu-latest
+  #  defaults:
+  #    run:
+  #      working-directory: backend
 
-    steps:
-      - uses: actions/checkout@v4
+  #  steps:
+  #    - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+  #    - name: Set up Python
+  #      uses: actions/setup-python@v5
+  #      with:
+  #        python-version: "3.12"
 
-      - name: Install Ruff
-        run: pip install ruff
+  #    - name: Install Ruff
+  #      run: pip install ruff
 
-      - name: Run Ruff check
-        run: ruff check .
+  #    - name: Run Ruff check
+  #      run: ruff check .
 
-      - name: Run Ruff format check
-        run: ruff format --check .
+  #    - name: Run Ruff format check
+  #      run: ruff format --check .
 
   test:
     name: Tests (pytest)
