@@ -7,7 +7,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json* ./
 
-RUN npm ci
+RUN npm install
 
 # ============================================
 # Stage 2: Development (Vite dev server)
@@ -30,7 +30,7 @@ COPY . .
 RUN npm run build
 
 # ============================================
-# Stage 4: Production (serve static via nginx-light)
+# Stage 4: Production (serve static via nginx)
 # ============================================
 FROM nginx:1.27-alpine AS production
 
