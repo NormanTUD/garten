@@ -39,7 +39,7 @@ Basics auf – ich bin erfahren.
 ### DevOps
 - **Docker** + **Docker Compose**
 - **GitHub Actions** CI/CD Pipeline
-- **Nginx** als Reverse Proxy
+- **Apache** als Reverse Proxy
 - Automatische **Linting** (Ruff für Python, ESLint + Prettier für JS)
 
 ---
@@ -127,7 +127,7 @@ text
 ## Entwicklungsphasen
 
 ### Phase 1: Foundation (Backend + Auth + Basis-CRUD + Minimales Frontend)
-1. Docker Compose Setup (Backend + Frontend + Nginx)
+1. Docker Compose Setup (Backend + Frontend + Apache)
 2. FastAPI Projekt-Skeleton mit Config, DB, Middleware
 3. User Model + Auth (JWT, Login, Admin erstellt User)
 4. Audit-Log Middleware
