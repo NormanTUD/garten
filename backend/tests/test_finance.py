@@ -31,7 +31,8 @@ async def test_create_category_duplicate_name(client: AsyncClient, admin_user):
         "/api/finance/categories/", headers=auth_header(token),
         json={"name": "Werkzeug"},
     )
-    assert response.status_code in (400, 409, 500)  # IntegrityError
+    assert response.status_code == 409
+    assert "already exists" in response.json()["detail"]
 
 
 async def test_list_categories(client: AsyncClient, admin_user):

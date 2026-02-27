@@ -38,7 +38,15 @@ async def list_categories(
 
 @category_router.post("/", response_model=ExpenseCategoryRead, status_code=status.HTTP_201_CREATED)
 async def create_category(data: ExpenseCategoryCreate, user: CurrentUser, db: DBSession):
-    return await service.create_category(db, data)
+    from sqlalchemy.exc import IntegrityError
+    try:
+        return await service.create_category(db, data)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Category '{data.name}' already exists",
+        )
 
 
 @category_router.patch("/{category_id}", response_model=ExpenseCategoryRead)
