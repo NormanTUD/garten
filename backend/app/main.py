@@ -65,7 +65,7 @@ def setup_routers(app: FastAPI) -> None:
     from app.auth.router import router as auth_router
     from app.auth.router import user_router
     from app.beds.router import planting_router, router as beds_router
-        from app.finance.router import (
+    from app.finance.router import (
         category_router, recurring_router, expense_router,
         payment_router, fund_router, receipt_router, standing_router,
     )
