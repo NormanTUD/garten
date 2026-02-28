@@ -19,6 +19,8 @@ Bewässerung, Gartenstunden und mehr – alles in einer Webapp, auch auf dem Han
 - **REST-API** – Vollständig dokumentiert (OpenAPI/Swagger), API-Key Support
 - **Audit-Logging** – Jeder API-Zugriff wird protokolliert
 
+(Bisher geht nur das Finanzsystem halbwegs!!!)
+
 ### Geplant (Phase 3-4)
 
 - 📸 Rechnungs-OCR (Qwen-VL, lokal serverseitig)
