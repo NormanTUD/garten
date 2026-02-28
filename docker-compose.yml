@@ -62,7 +62,7 @@ services:
     restart: unless-stopped
     ports:
       - "8181:80"
-      - "443:443"
+      - "8282:443"
     volumes:
       - ./apache/certs:/etc/ssl/gartenapp:ro
     depends_on:
