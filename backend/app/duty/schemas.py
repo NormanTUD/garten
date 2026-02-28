@@ -68,8 +68,7 @@ class DutyAssignmentRead(BaseModel):
 class DutyLogCreate(BaseModel):
     date: date
     hours: float = Field(gt=0)
-    description: str = ""
-
+    description: str | None = None
 
 class DutyLogRead(BaseModel):
     id: int
