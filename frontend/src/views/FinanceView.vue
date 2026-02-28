@@ -89,6 +89,7 @@ interface MemberBalance {
   remaining_cents: number;
   remaining_projected_cents: number;
   duty_compensation_cents: number;
+  carry_over_cents: number;
 }
 
 interface FundOverview {
@@ -592,8 +593,16 @@ function projectedBalanceColor(remaining: number): string {
           </div>
           <div class="text-caption" v-if="myBalance.duty_compensation_cents > 0">
             + {{ eur(myBalance.duty_compensation_cents) }} Ausgleich Gartenstunden
+              <span v-if="b.carry_over_cents !== 0" class="text-caption">
+                · {{ b.carry_over_cents > 0 ? '+' : '-' }}{{ eur(Math.abs(b.carry_over_cents)) }} Übertrag
+              </span>
           </div>
-
+          <div class="text-caption" v-if="myBalance.carry_over_cents > 0">
+            + {{ eur(myBalance.carry_over_cents) }} Übertrag aus {{ selectedYear - 1 }} (Schulden)
+          </div>
+          <div class="text-caption" v-if="myBalance.carry_over_cents < 0">
+            - {{ eur(Math.abs(myBalance.carry_over_cents)) }} Übertrag aus {{ selectedYear - 1 }} (Guthaben)
+          </div>
 
           <!-- Prognose -->
           <v-divider class="my-3" />

@@ -19,6 +19,7 @@ interface MemberBalance {
   remaining_cents: number;
   remaining_projected_cents: number;
   duty_compensation_cents: number;
+  carry_over_cents: number;
 }
 
 interface FundOverview {
@@ -174,6 +175,14 @@ onMounted(() => loadData());
             <tr v-if="myBalance.duty_compensation_cents > 0">
               <td class="pl-0">Ausgleich Gartenstunden</td>
               <td class="text-right pr-0 text-error">+ {{ eur(myBalance.duty_compensation_cents) }}</td>
+            </tr>
+            <tr v-if="myBalance.carry_over_cents > 0">
+              <td class="pl-0">Übertrag aus {{ selectedYear - 1 }} (Schulden)</td>
+              <td class="text-right pr-0 text-error">+ {{ eur(myBalance.carry_over_cents) }}</td>
+            </tr>
+            <tr v-if="myBalance.carry_over_cents < 0">
+              <td class="pl-0">Übertrag aus {{ selectedYear - 1 }} (Guthaben)</td>
+              <td class="text-right pr-0 text-success">- {{ eur(Math.abs(myBalance.carry_over_cents)) }}</td>
             </tr>
             <tr class="font-weight-bold">
               <td class="pl-0">Gesamt-Soll</td>

@@ -75,6 +75,16 @@ async def calculate_fund_overview(
     year_start = date(year, 1, 1)
     year_end = date(year, 12, 31)
 
+    # ─── Carry-over from previous year ─────────────────────────
+    # Calculate what each member owed/overpaid at end of previous year
+    carry_over_map: dict[int, int] = {}
+    if year > 2025:  # No carry-over before first year
+        prev_overview = await calculate_fund_overview(db, year=year - 1)
+        for mb in prev_overview.member_balances:
+            # remaining_projected_cents > 0 means they still owed money (carry forward as debt)
+            # remaining_projected_cents < 0 means they overpaid (carry forward as credit)
+            carry_over_map[mb.user_id] = mb.remaining_projected_cents
+
     # ─── Recurring costs active in this year ───────────────────
     recurring_result = await db.execute(
         select(RecurringCost)
@@ -217,12 +227,13 @@ async def calculate_fund_overview(
         standing_actual = standing_map_actual.get(member.id, 0)
         standing_projected = standing_map_projected.get(member.id, 0)
         duty_compensation = duty_compensation_map.get(member.id, 0)
+        carry_over = carry_over_map.get(member.id, 0)
 
         income_actual = paid + standing_actual
         income_projected = paid + standing_projected
 
-        # Share + duty compensation = total obligation
-        member_total = share_total_annual + duty_compensation
+        # Share + duty compensation + carry-over from previous year
+        member_total = share_total_annual + duty_compensation + carry_over
 
         remaining = member_total - income_actual
         remaining_projected = member_total - income_projected
@@ -238,10 +249,11 @@ async def calculate_fund_overview(
                 total_income_projected_cents=income_projected,
                 share_recurring_cents=share_recurring_annual,
                 share_onetime_cents=share_onetime,
-                share_total_cents=member_total,  # Now includes duty compensation
+                share_total_cents=member_total,
                 remaining_cents=remaining,
                 remaining_projected_cents=remaining_projected,
-                duty_compensation_cents=duty_compensation,  # NEU
+                duty_compensation_cents=duty_compensation,
+                carry_over_cents=carry_over,
             )
         )
 
