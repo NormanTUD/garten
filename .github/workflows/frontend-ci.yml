@@ -27,6 +27,8 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
+          # Using a glob pattern ensures it finds the file even if pathing is tricky
+          cache-dependency-path: "**/package-lock.json"
 
       - name: Install dependencies
         run: npm ci
