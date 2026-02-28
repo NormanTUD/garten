@@ -34,13 +34,36 @@ interface FundOverview {
   member_balances: MemberBalance[];
 }
 
+interface DutyBalance {
+  user_id: number;
+  display_name: string;
+  assigned_hours: number;
+  logged_hours: number;
+  confirmed_hours: number;
+  remaining_hours: number;
+  compensation_cents: number;
+}
+
+interface DutyOverview {
+  year: number;
+  total_hours: number;
+  hourly_rate_cents: number;
+  balances: DutyBalance[];
+}
+
 const stats = ref<Stats>({ gardens: 0, beds: 0, plants: 0, harvests: 0 });
 const fund = ref<FundOverview | null>(null);
+const duty = ref<DutyOverview | null>(null);
 const loading = ref(true);
 
 const myBalance = computed(() => {
   if (!fund.value || !auth.user) return null;
   return fund.value.member_balances.find((b) => b.user_id === auth.user!.id) || null;
+});
+
+const myDuty = computed(() => {
+  if (!duty.value?.balances || !auth.user) return null;
+  return duty.value.balances.find((b) => b.user_id === auth.user!.id) || null;
 });
 
 function eur(cents: number): string {
@@ -59,19 +82,27 @@ function balanceText(remaining: number): string {
   return "ausgeglichen ✓";
 }
 
+function dutyCardColor(remaining: number): string {
+  if (remaining <= 0) return "success";
+  return "warning";
+}
+
 onMounted(async () => {
   try {
-    const [gardens, plants, harvests, fundData] = await Promise.all([
+    const currentYear = new Date().getFullYear();
+    const [gardens, plants, harvests, fundData, dutyData] = await Promise.all([
       api.get<any[]>("/gardens/"),
       api.get<any[]>("/plants/"),
       api.get<any[]>("/harvests/"),
       api.get<FundOverview>("/finance/fund/"),
+      api.get<DutyOverview>(`/duty/overview/${currentYear}`).catch(() => null),
     ]);
 
     stats.value.gardens = gardens.length;
     stats.value.plants = plants.length;
     stats.value.harvests = harvests.length;
     fund.value = fundData;
+    duty.value = dutyData;
 
     let bedCount = 0;
     for (const garden of gardens) {
@@ -122,47 +153,60 @@ onMounted(async () => {
       </v-card-text>
     </v-card>
 
-    <!-- ═══ Garden Stats ═══════════════════════════════════════ -->
-    <!--
-    <v-row>
-      <v-col cols="6" md="3">
-        <v-card color="primary" variant="tonal">
-          <v-card-text class="text-center">
-            <v-icon icon="mdi-flower" size="40" class="mb-2" />
-            <div class="text-h4 font-weight-bold">{{ stats.gardens }}</div>
-            <div class="text-body-2">Gärten</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="6" md="3">
-        <v-card color="secondary" variant="tonal">
-          <v-card-text class="text-center">
-            <v-icon icon="mdi-grid" size="40" class="mb-2" />
-            <div class="text-h4 font-weight-bold">{{ stats.beds }}</div>
-            <div class="text-body-2">Beete</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="6" md="3">
-        <v-card color="accent" variant="tonal">
-          <v-card-text class="text-center">
-            <v-icon icon="mdi-leaf" size="40" class="mb-2" />
-            <div class="text-h4 font-weight-bold">{{ stats.plants }}</div>
-            <div class="text-body-2">Pflanzen</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="6" md="3">
-        <v-card color="success" variant="tonal">
-          <v-card-text class="text-center">
-            <v-icon icon="mdi-basket" size="40" class="mb-2" />
-            <div class="text-h4 font-weight-bold">{{ stats.harvests }}</div>
-            <div class="text-body-2">Ernten</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
-    -->
+    <!-- ═══ My Duty Status ═════════════════════════════════════ -->
+    <v-card
+      v-if="myDuty && duty"
+      :color="dutyCardColor(myDuty.remaining_hours)"
+      variant="tonal"
+      class="mb-6"
+      to="/duty"
+    >
+      <v-card-text class="d-flex align-center pa-4">
+        <div class="flex-grow-1">
+          <div class="text-body-2 text-medium-emphasis">Deine Gartenstunden {{ duty!.year }}</div>
+
+          <!-- Fertig oder Überstunden -->
+          <template v-if="myDuty.remaining_hours <= 0">
+            <div class="text-h4 font-weight-bold my-1">
+              Erledigt! 🎉
+            </div>
+            <div class="text-body-2">
+              {{ myDuty.logged_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
+              <span v-if="myDuty.remaining_hours < 0">
+                · {{ Math.abs(myDuty.remaining_hours) }}h extra
+              </span>
+            </div>
+          </template>
+
+          <!-- Noch offen -->
+          <template v-else>
+            <div class="text-h4 font-weight-bold my-1">
+              {{ myDuty.remaining_hours }}h offen
+            </div>
+            <div class="text-body-2">
+              {{ myDuty.logged_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
+            </div>
+            <div v-if="myDuty.compensation_cents > 0" class="text-caption mt-1">
+              Alternativ: {{ eur(myDuty.compensation_cents) }} Ausgleich
+              ({{ eur(duty!.hourly_rate_cents) }}/h)
+            </div>
+          </template>
+        </div>
+        <div class="text-right">
+          <v-icon icon="mdi-shovel" size="48" class="mb-2" />
+          <div class="text-caption">
+            {{ myDuty.confirmed_hours }}h bestätigt
+          </div>
+        </div>
+      </v-card-text>
+
+      <!-- Progress Bar -->
+      <v-progress-linear
+        :model-value="Math.min((myDuty.logged_hours / myDuty.assigned_hours) * 100, 100)"
+        :color="myDuty.remaining_hours <= 0 ? 'success' : 'warning'"
+        height="6"
+      />
+    </v-card>
 
     <!-- ═══ All Members Overview ═══════════════════════════════ -->
     <v-card v-if="fund" class="mt-6">
