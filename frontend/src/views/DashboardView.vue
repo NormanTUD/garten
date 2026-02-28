@@ -377,24 +377,26 @@ onMounted(() => loadData());
                   · +{{ eur(b.duty_compensation_cents) }} Gartenstunden
                 </span>
               </div>
-
               <!-- Prognose-Zeile (nur aktuelles Jahr) -->
               <div v-if="isCurrentYear" class="mt-1">
                 <template v-if="b.remaining_projected_cents <= 0">
                   <v-icon icon="mdi-check-circle" size="x-small" color="success" class="mr-1" />
                   <span class="text-caption text-success">
-                    Ende Jahr gedeckt
+                    Schätzung Ende {{ selectedYear }}: gedeckt
                     <span v-if="b.remaining_projected_cents < 0">
-                      · {{ eur(Math.abs(b.remaining_projected_cents)) }} Rückzahlung
+                      · ca. {{ eur(Math.abs(b.remaining_projected_cents)) }} Rückzahlung
                     </span>
                   </span>
                 </template>
                 <template v-else>
                   <v-icon icon="mdi-alert" size="x-small" color="error" class="mr-1" />
                   <span class="text-caption text-error">
-                    Prognose: {{ eur(b.remaining_projected_cents) }} Nachzahlung
+                    Schätzung Ende {{ selectedYear }}: ca. {{ eur(b.remaining_projected_cents) }} Nachzahlung
                   </span>
                 </template>
+                <div class="text-caption text-medium-emphasis" style="font-size: 0.65rem !important;">
+                  * basierend auf aktuellen Daueraufträgen & Umlagen
+                </div>
               </div>
             </template>
 
@@ -409,14 +411,14 @@ onMounted(() => loadData());
                 </div>
 
                 <!-- Prognose Ende Jahr (nur aktuelles Jahr) -->
-                <div v-if="isCurrentYear && b.remaining_projected_cents !== b.remaining_cents" class="mt-1">
+                <div v-if="isCurrentYear" class="mt-1">
                   <div
                     class="text-caption font-weight-bold"
                     :class="b.remaining_projected_cents > 0 ? 'text-error' : 'text-success'"
                   >
-                    → {{ b.remaining_projected_cents > 0 ? '' : '+' }}{{ eur(Math.abs(b.remaining_projected_cents)) }}
+                    → ca. {{ eur(Math.abs(b.remaining_projected_cents)) }}
                     <span class="font-weight-regular">
-                      {{ b.remaining_projected_cents > 0 ? 'Ende Jahr' : 'Guthaben' }}
+                      {{ b.remaining_projected_cents > 0 ? 'Nachzahlung*' : b.remaining_projected_cents < 0 ? 'Guthaben*' : 'ausgeglichen*' }}
                     </span>
                   </div>
                 </div>
