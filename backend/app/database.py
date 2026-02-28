@@ -25,7 +25,7 @@ else:
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
 
-engine = create_async_engine(settings.database_url, **engine_kwargs)
+engine = create_async_engine(settings.async_database_url, **engine_kwargs)
 
 # ─── SQLite Pragmas ────────────────────────────────────────────────
 
