@@ -5,31 +5,34 @@ import { useAuthStore } from "@/stores/auth";
 
 const auth = useAuthStore();
 
-interface Stats {
-  gardens: number;
-  beds: number;
-  plants: number;
-  harvests: number;
-}
-
 interface MemberBalance {
   user_id: number;
   display_name: string;
   total_paid_cents: number;
   total_standing_order_cents: number;
+  total_standing_order_projected_cents: number;
   total_income_cents: number;
+  total_income_projected_cents: number;
   share_recurring_cents: number;
   share_onetime_cents: number;
   share_total_cents: number;
   remaining_cents: number;
+  remaining_projected_cents: number;
+  duty_compensation_cents: number;
 }
 
 interface FundOverview {
+  total_recurring_monthly_cents: number;
+  total_recurring_annual_cents: number;
+  total_onetime_expenses_cents: number;
   total_costs_annual_cents: number;
   total_income_cents: number;
+  total_income_projected_cents: number;
   fund_balance_cents: number;
   share_recurring_per_member_monthly_cents: number;
+  share_recurring_per_member_annual_cents: number;
   share_total_per_member_annual_cents: number;
+  share_total_per_member_monthly_cents: number;
   member_count: number;
   member_balances: MemberBalance[];
 }
@@ -48,10 +51,9 @@ interface DutyOverview {
   year: number;
   total_hours: number;
   hourly_rate_cents: number;
-  balances: DutyBalance[];
+  member_balances: DutyBalance[];
 }
 
-const stats = ref<Stats>({ gardens: 0, beds: 0, plants: 0, harvests: 0 });
 const fund = ref<FundOverview | null>(null);
 const duty = ref<DutyOverview | null>(null);
 const loading = ref(true);
@@ -62,8 +64,8 @@ const myBalance = computed(() => {
 });
 
 const myDuty = computed(() => {
-  if (!duty.value?.balances || !auth.user) return null;
-  return duty.value.balances.find((b) => b.user_id === auth.user!.id) || null;
+  if (!duty.value?.member_balances || !auth.user) return null;
+  return duty.value.member_balances.find((b) => b.user_id === auth.user!.id) || null;
 });
 
 function eur(cents: number): string {
@@ -90,26 +92,13 @@ function dutyCardColor(remaining: number): string {
 onMounted(async () => {
   try {
     const currentYear = new Date().getFullYear();
-    const [gardens, plants, harvests, fundData, dutyData] = await Promise.all([
-      api.get<any[]>("/gardens/"),
-      api.get<any[]>("/plants/"),
-      api.get<any[]>("/harvests/"),
+    const [fundData, dutyData] = await Promise.all([
       api.get<FundOverview>("/finance/fund/"),
       api.get<DutyOverview>(`/duty/overview/${currentYear}`).catch(() => null),
     ]);
 
-    stats.value.gardens = gardens.length;
-    stats.value.plants = plants.length;
-    stats.value.harvests = harvests.length;
     fund.value = fundData;
     duty.value = dutyData;
-
-    let bedCount = 0;
-    for (const garden of gardens) {
-      const beds = await api.get<any[]>("/beds/", { garden_id: garden.id });
-      bedCount += beds.length;
-    }
-    stats.value.beds = bedCount;
   } catch {
     // Silently fail
   } finally {
@@ -124,7 +113,7 @@ onMounted(async () => {
       Hallo, {{ auth.displayName }}! 👋
     </h1>
 
-    <!-- ═══ My Finance Status (prominent) ══════════════════════ -->
+    <!-- ═══ My Finance Status ══════════════════════════════════ -->
     <v-card
       v-if="myBalance"
       :color="balanceColor(myBalance.remaining_cents)"
@@ -134,14 +123,18 @@ onMounted(async () => {
     >
       <v-card-text class="d-flex align-center pa-4">
         <div class="flex-grow-1">
-          <div class="text-body-2 text-medium-emphasis">Dein Kassenstand</div>
+          <div class="text-body-2 text-medium-emphasis">Dein Kassenstand {{ new Date().getFullYear() }}</div>
           <div class="text-h4 font-weight-bold my-1">
             {{ eur(Math.abs(myBalance.remaining_cents)) }}
           </div>
           <div class="text-body-2">{{ balanceText(myBalance.remaining_cents) }}</div>
           <div class="text-caption mt-1">
             Soll: {{ eur(myBalance.share_total_cents) }}
-            · Eingezahlt: {{ eur(myBalance.total_income_cents) }}
+            · Bezahlt: {{ eur(myBalance.total_paid_cents) }}
+            · Daueraufträge: {{ eur(myBalance.total_standing_order_cents) }}
+          </div>
+          <div v-if="myBalance.duty_compensation_cents > 0" class="text-caption">
+            + {{ eur(myBalance.duty_compensation_cents) }} Ausgleich Gartenstunden
           </div>
         </div>
         <div class="text-right">
@@ -163,7 +156,7 @@ onMounted(async () => {
     >
       <v-card-text class="d-flex align-center pa-4">
         <div class="flex-grow-1">
-          <div class="text-body-2 text-medium-emphasis">Deine Gartenstunden {{ duty!.year }}</div>
+          <div class="text-body-2 text-medium-emphasis">Deine Gartenstunden {{ duty.year }}</div>
 
           <!-- Fertig oder Überstunden -->
           <template v-if="myDuty.remaining_hours <= 0">
@@ -171,7 +164,7 @@ onMounted(async () => {
               Erledigt! 🎉
             </div>
             <div class="text-body-2">
-	      {{ myDuty.confirmed_hours + myDuty.pending_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
+              {{ myDuty.confirmed_hours + myDuty.pending_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
               <span v-if="myDuty.remaining_hours < 0">
                 · {{ Math.abs(myDuty.remaining_hours) }}h extra
               </span>
@@ -184,11 +177,11 @@ onMounted(async () => {
               {{ myDuty.remaining_hours }}h offen
             </div>
             <div class="text-body-2">
-	      {{ myDuty.confirmed_hours + myDuty.pending_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
+              {{ myDuty.confirmed_hours + myDuty.pending_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
             </div>
             <div v-if="myDuty.compensation_cents > 0" class="text-caption mt-1">
               Alternativ: {{ eur(myDuty.compensation_cents) }} Ausgleich
-              ({{ eur(duty!.hourly_rate_cents) }}/h)
+              ({{ eur(duty.hourly_rate_cents) }}/h)
             </div>
           </template>
         </div>
@@ -196,6 +189,9 @@ onMounted(async () => {
           <v-icon icon="mdi-shovel" size="48" class="mb-2" />
           <div class="text-caption">
             {{ myDuty.confirmed_hours }}h bestätigt
+          </div>
+          <div v-if="myDuty.pending_hours > 0" class="text-caption">
+            {{ myDuty.pending_hours }}h ausstehend
           </div>
         </div>
       </v-card-text>
@@ -258,6 +254,9 @@ onMounted(async () => {
               <span v-if="b.total_standing_order_cents > 0" class="text-caption">
                 (davon {{ eur(b.total_standing_order_cents) }} Dauerauftrag)
               </span>
+              <span v-if="b.duty_compensation_cents > 0" class="text-caption">
+                · +{{ eur(b.duty_compensation_cents) }} Gartenstunden
+              </span>
             </template>
 
             <template #append>
@@ -278,3 +277,4 @@ onMounted(async () => {
     <v-skeleton-loader v-if="loading" type="card" class="mt-6" />
   </div>
 </template>
+
