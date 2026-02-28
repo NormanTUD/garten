@@ -23,7 +23,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("icon", sa.String(50), nullable=True),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False,
             server_default=sa.func.now(),
@@ -42,7 +42,7 @@ def upgrade() -> None:
         sa.Column("interval", sa.String(20), nullable=False),  # monthly, yearly
         sa.Column("valid_from", sa.Date(), nullable=False),
         sa.Column("valid_to", sa.Date(), nullable=True),  # NULL = unbegrenzt gültig
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False,
@@ -70,8 +70,8 @@ def upgrade() -> None:
             "created_at", sa.DateTime(timezone=True), nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.Column("is_shared", sa.Boolean(), nullable=False, server_default=sa.text("1")),
-        sa.Column("confirmed_by_admin", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("is_shared", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("confirmed_by_admin", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("confirmed_by_id", sa.Integer(), nullable=True),
 
         sa.PrimaryKeyConstraint("id"),
@@ -93,7 +93,7 @@ def upgrade() -> None:
         sa.Column("description", sa.String(500), nullable=True),
         sa.Column("payment_date", sa.Date(), nullable=False),
         sa.Column("receipt_image_path", sa.String(500), nullable=True),
-        sa.Column("confirmed_by_admin", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("confirmed_by_admin", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False,
@@ -116,7 +116,7 @@ def upgrade() -> None:
         sa.Column("description", sa.String(500), nullable=True),
         sa.Column("valid_from", sa.Date(), nullable=False),
         sa.Column("valid_to", sa.Date(), nullable=True),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False,

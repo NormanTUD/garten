@@ -18,9 +18,10 @@ async def lifespan(app: FastAPI):
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
     Path("data").mkdir(parents=True, exist_ok=True)
 
-    if settings.debug:
-        await create_all_tables()
-        logger.info("Database tables created (debug mode)")
+    # ❌ DIESE 3 ZEILEN ENTFERNEN:
+    # if settings.debug:
+    #     await create_all_tables()
+    #     logger.info("Database tables created (debug mode)")
 
     from app.auth.service import ensure_admin_exists
     from app.messaging.default_rules import seed_default_rules
@@ -32,7 +33,6 @@ async def lifespan(app: FastAPI):
 
     yield
     logger.info("Shutting down %s", settings.app_name)
-
 
 def create_app(audit_session_factory=None) -> FastAPI:
     app = FastAPI(

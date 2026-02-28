@@ -20,8 +20,8 @@ def upgrade() -> None:
         sa.Column("subject", sa.String(200), nullable=False),
         sa.Column("body", sa.Text(), nullable=False),
         sa.Column("message_type", sa.String(30), nullable=False, server_default="manual"),
-        sa.Column("is_read", sa.Boolean(), nullable=False, server_default=sa.text("0")),
-        sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("is_read", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("related_entity", sa.String(50), nullable=True),  # e.g. "expense", "payment"
         sa.Column("related_entity_id", sa.Integer(), nullable=True),
         sa.Column(
@@ -44,7 +44,7 @@ def upgrade() -> None:
         sa.Column("event_type", sa.String(50), nullable=False, unique=True),
         sa.Column("subject_template", sa.String(200), nullable=False),
         sa.Column("body_template", sa.Text(), nullable=False),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("send_to", sa.String(30), nullable=False, server_default="affected_user"),
         sa.Column(
             "created_at", sa.DateTime(timezone=True), nullable=False,

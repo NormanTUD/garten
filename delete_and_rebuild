@@ -1,7 +1,13 @@
 #!/bin/bash
 
-docker compose down -v --remove-orphans
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v --remove-orphans
 docker volume prune -f
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build db
+echo "⏳ Warte auf DB..."
 sleep 5
-docker compose exec backend alembic upgrade head
+
+# Alembic ZUERST
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm backend alembic upgrade head
+
+# Dann alles starten
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
