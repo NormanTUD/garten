@@ -95,6 +95,31 @@ async def normal_user():
         token = create_access_token(user.id, user.role)
         return user, token
 
+@pytest.fixture
+async def admin_client(client: AsyncClient, admin_user) -> AsyncClient:
+    """An AsyncClient that sends requests with admin auth headers."""
+    user, token = admin_user
+    client.headers.update(auth_header(token))
+    return client
+
+
+@pytest.fixture
+async def user_client(admin_user, normal_user) -> AsyncClient:
+    """A separate AsyncClient that sends requests with normal user auth headers."""
+    user, token = normal_user
+    app = create_app(audit_session_factory=test_session_factory)
+    app.dependency_overrides[get_async_session] = override_get_async_session
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers.update(auth_header(token))
+        yield ac
+
+
+@pytest.fixture
+async def test_user_id(normal_user) -> int:
+    """The ID of the normal test user."""
+    user, token = normal_user
+    return user.id
 
 def auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
