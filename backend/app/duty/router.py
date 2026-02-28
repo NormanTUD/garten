@@ -1,8 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, status
 
-from app.dependencies import get_db, get_current_user, require_admin
-from app.auth.models import User
+from app.dependencies import DBSession, CurrentUser, AdminUser
 from app.duty import service
 from app.duty.schemas import (
     DutyConfigCreate,
@@ -16,22 +14,18 @@ from app.duty.schemas import (
     DutyOverview,
 )
 
-DBSession = Depends(get_db)
-CurrentUser = Depends(get_current_user)
-AdminUser = Depends(require_admin)
-
 router = APIRouter(prefix="/duty", tags=["duty"])
 
 
 # ─── Config (Admin only) ──────────────────────────────────
 
 @router.get("/config", response_model=list[DutyConfigRead])
-async def list_configs(user: User = CurrentUser, db: AsyncSession = DBSession):
+async def list_configs(user: CurrentUser, db: DBSession):
     return await service.get_all_configs(db)
 
 
 @router.get("/config/{year}", response_model=DutyConfigRead)
-async def get_config(year: int, user: User = CurrentUser, db: AsyncSession = DBSession):
+async def get_config(year: int, user: CurrentUser, db: DBSession):
     config = await service.get_config(db, year)
     if not config:
         raise HTTPException(status_code=404, detail=f"No config for year {year}")
@@ -39,9 +33,7 @@ async def get_config(year: int, user: User = CurrentUser, db: AsyncSession = DBS
 
 
 @router.post("/config", response_model=DutyConfigRead, status_code=status.HTTP_201_CREATED)
-async def create_config(
-    data: DutyConfigCreate, user: User = AdminUser, db: AsyncSession = DBSession
-):
+async def create_config(data: DutyConfigCreate, user: AdminUser, db: DBSession):
     existing = await service.get_config(db, data.year)
     if existing:
         raise HTTPException(status_code=409, detail=f"Config for {data.year} already exists")
@@ -51,9 +43,7 @@ async def create_config(
 
 
 @router.put("/config/{year}", response_model=DutyConfigRead)
-async def update_config(
-    year: int, data: DutyConfigUpdate, user: User = AdminUser, db: AsyncSession = DBSession
-):
+async def update_config(year: int, data: DutyConfigUpdate, user: AdminUser, db: DBSession):
     config = await service.update_config(db, year, data)
     if not config:
         raise HTTPException(status_code=404, detail=f"No config for year {year}")
@@ -62,7 +52,7 @@ async def update_config(
 
 
 @router.delete("/config/{year}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_config(year: int, user: User = AdminUser, db: AsyncSession = DBSession):
+async def delete_config(year: int, user: AdminUser, db: DBSession):
     deleted = await service.delete_config(db, year)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"No config for year {year}")
@@ -72,17 +62,13 @@ async def delete_config(year: int, user: User = AdminUser, db: AsyncSession = DB
 # ─── Assignments (Admin only) ─────────────────────────────
 
 @router.get("/assignments/{year}", response_model=list[DutyAssignmentRead])
-async def list_assignments(
-    year: int, user: User = CurrentUser, db: AsyncSession = DBSession
-):
+async def list_assignments(year: int, user: CurrentUser, db: DBSession):
     assignments = await service.get_assignments(db, year)
     return [DutyAssignmentRead.from_model(a) for a in assignments]
 
 
 @router.post("/assignments", response_model=DutyAssignmentRead, status_code=status.HTTP_201_CREATED)
-async def create_assignment(
-    data: DutyAssignmentCreate, user: User = AdminUser, db: AsyncSession = DBSession
-):
+async def create_assignment(data: DutyAssignmentCreate, user: AdminUser, db: DBSession):
     existing = await service.get_assignment(db, data.user_id, data.year)
     if existing:
         raise HTTPException(status_code=409, detail="Assignment already exists for this user/year")
@@ -94,10 +80,7 @@ async def create_assignment(
 
 @router.put("/assignments/{assignment_id}", response_model=DutyAssignmentRead)
 async def update_assignment(
-    assignment_id: int,
-    data: DutyAssignmentUpdate,
-    user: User = AdminUser,
-    db: AsyncSession = DBSession,
+    assignment_id: int, data: DutyAssignmentUpdate, user: AdminUser, db: DBSession
 ):
     assignment = await service.update_assignment(db, assignment_id, data)
     if not assignment:
@@ -107,9 +90,7 @@ async def update_assignment(
 
 
 @router.delete("/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_assignment(
-    assignment_id: int, user: User = AdminUser, db: AsyncSession = DBSession
-):
+async def delete_assignment(assignment_id: int, user: AdminUser, db: DBSession):
     deleted = await service.delete_assignment(db, assignment_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -117,7 +98,7 @@ async def delete_assignment(
 
 
 @router.post("/assignments/{year}/auto-assign", response_model=list[DutyAssignmentRead])
-async def auto_assign(year: int, user: User = AdminUser, db: AsyncSession = DBSession):
+async def auto_assign(year: int, user: AdminUser, db: DBSession):
     try:
         assignments = await service.auto_assign_equal(db, year)
     except ValueError as e:
@@ -129,17 +110,13 @@ async def auto_assign(year: int, user: User = AdminUser, db: AsyncSession = DBSe
 # ─── Logs ──────────────────────────────────────────────────
 
 @router.get("/logs/{year}", response_model=list[DutyLogRead])
-async def list_logs(
-    year: int, user_id: int | None = None, user: User = CurrentUser, db: AsyncSession = DBSession
-):
+async def list_logs(year: int, user: CurrentUser, db: DBSession, user_id: int | None = None):
     logs = await service.get_logs(db, year, user_id=user_id)
     return [DutyLogRead.from_model(log) for log in logs]
 
 
 @router.post("/logs", response_model=DutyLogRead, status_code=status.HTTP_201_CREATED)
-async def create_log(
-    data: DutyLogCreate, user: User = CurrentUser, db: AsyncSession = DBSession
-):
+async def create_log(data: DutyLogCreate, user: CurrentUser, db: DBSession):
     is_admin = user.role == "admin"
     log = await service.create_log(db, user.id, data, is_admin=is_admin)
     await db.refresh(log)
@@ -148,9 +125,7 @@ async def create_log(
 
 
 @router.post("/logs/{log_id}/confirm", response_model=DutyLogRead)
-async def confirm_log(
-    log_id: int, user: User = AdminUser, db: AsyncSession = DBSession
-):
+async def confirm_log(log_id: int, user: AdminUser, db: DBSession):
     log = await service.confirm_log(db, log_id, user.id)
     if not log:
         raise HTTPException(status_code=404, detail="Log not found")
@@ -159,9 +134,7 @@ async def confirm_log(
 
 
 @router.post("/logs/{log_id}/unconfirm", response_model=DutyLogRead)
-async def unconfirm_log(
-    log_id: int, user: User = AdminUser, db: AsyncSession = DBSession
-):
+async def unconfirm_log(log_id: int, user: AdminUser, db: DBSession):
     log = await service.unconfirm_log(db, log_id)
     if not log:
         raise HTTPException(status_code=404, detail="Log not found")
@@ -170,9 +143,7 @@ async def unconfirm_log(
 
 
 @router.delete("/logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_log(
-    log_id: int, user: User = AdminUser, db: AsyncSession = DBSession
-):
+async def delete_log(log_id: int, user: AdminUser, db: DBSession):
     deleted = await service.delete_log(db, log_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Log not found")
@@ -182,9 +153,7 @@ async def delete_log(
 # ─── Overview ──────────────────────────────────────────────
 
 @router.get("/overview/{year}", response_model=DutyOverview)
-async def get_overview(
-    year: int, user: User = CurrentUser, db: AsyncSession = DBSession
-):
+async def get_overview(year: int, user: CurrentUser, db: DBSession):
     overview = await service.get_overview(db, year)
     if not overview:
         raise HTTPException(
