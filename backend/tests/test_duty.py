@@ -233,12 +233,13 @@ class TestDutyLogs:
         assert resp.status_code == 422
 
     async def test_create_log_empty_description(self, user_client: AsyncClient):
+        """Empty description should be allowed (description is optional)."""
         resp = await user_client.post("/api/duty/logs", json={
             "date": date.today().isoformat(),
             "hours": 1.0,
             "description": "",
         })
-        assert resp.status_code == 422
+        assert resp.status_code == 201
 
     async def test_confirm_log(self, admin_client: AsyncClient, duty_log: dict):
         assert duty_log["confirmed"] is False
