@@ -172,6 +172,7 @@ class MemberBalance(BaseModel):
     share_total_cents: int
     remaining_cents: int                      # Actual: positive = owes, negative = overpaid
     remaining_projected_cents: int            # Projected: positive = will owe, negative = will be refunded
+    duty_compensation_cents: int = 0
 
 
 class GardenFundOverview(BaseModel):

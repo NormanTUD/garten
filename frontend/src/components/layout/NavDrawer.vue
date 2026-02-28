@@ -15,6 +15,7 @@ const navItems = [
   { title: "Bewässerung", icon: "mdi-water", to: "/watering" },
   */
   { title: "Finanzen", icon: "mdi-cash-register", to: "/finance" },
+  { title: "Gartenstunden", icon: "mdi-shovel", to: "/duty" },  // NEU
   { title: "Nachrichten", icon: "mdi-email", to: "/messages" },
 ];
 

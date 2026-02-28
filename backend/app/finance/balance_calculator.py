@@ -12,6 +12,7 @@ from app.finance.models import (
     StandingOrderSkip,
 )
 from app.finance.schemas import GardenFundOverview, MemberBalance
+from app.duty.service import get_overview as get_duty_overview
 
 
 def _months_active_in_year(
@@ -195,19 +196,30 @@ async def calculate_fund_overview(
     total_income_actual = total_payments + total_standing_actual
     total_income_projected = total_payments + total_standing_projected
 
+    # ─── Duty compensation (flows into finance) ───────────────
+    duty_overview = await get_duty_overview(db, year)
+    duty_compensation_map: dict[int, int] = {}
+    if duty_overview:
+        for balance in duty_overview.member_balances:
+            if balance.compensation_cents > 0:
+                duty_compensation_map[balance.user_id] = balance.compensation_cents
+
     # ─── Per-member balance ────────────────────────────────────
     member_balances = []
     for member in members:
         paid = payments_map.get(member.id, 0)
         standing_actual = standing_map_actual.get(member.id, 0)
         standing_projected = standing_map_projected.get(member.id, 0)
+        duty_compensation = duty_compensation_map.get(member.id, 0)
 
         income_actual = paid + standing_actual
         income_projected = paid + standing_projected
 
-        # positive = owes money, negative = overpaid (gets refund)
-        remaining = share_total_annual - income_actual
-        remaining_projected = share_total_annual - income_projected
+        # Share + duty compensation = total obligation
+        member_total = share_total_annual + duty_compensation
+
+        remaining = member_total - income_actual
+        remaining_projected = member_total - income_projected
 
         member_balances.append(
             MemberBalance(
@@ -220,9 +232,10 @@ async def calculate_fund_overview(
                 total_income_projected_cents=income_projected,
                 share_recurring_cents=share_recurring_annual,
                 share_onetime_cents=share_onetime,
-                share_total_cents=share_total_annual,
+                share_total_cents=member_total,  # Now includes duty compensation
                 remaining_cents=remaining,
                 remaining_projected_cents=remaining_projected,
+                duty_compensation_cents=duty_compensation,  # NEU
             )
         )
 

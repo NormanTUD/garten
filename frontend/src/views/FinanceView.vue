@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+	import { ref, computed, onMounted, watch } from "vue";
 import { api } from "@/api/client";
 import { useAuthStore } from "@/stores/auth";
 import PhotoCapture from "@/components/shared/PhotoCapture.vue";
@@ -88,6 +88,7 @@ interface MemberBalance {
   share_total_cents: number;
   remaining_cents: number;
   remaining_projected_cents: number;
+  duty_compensation_cents: number;
 }
 
 interface FundOverview {
@@ -580,6 +581,10 @@ function projectedBalanceColor(remaining: number): string {
           <div class="text-caption">
             ({{ eur(myBalance.share_recurring_cents) }} laufend + {{ eur(myBalance.share_onetime_cents) }} Einmal-Umlagen)
           </div>
+          <div class="text-caption" v-if="myBalance.duty_compensation_cents > 0">
+            + {{ eur(myBalance.duty_compensation_cents) }} Ausgleich Gartenstunden
+          </div>
+
 
           <!-- Prognose -->
           <v-divider class="my-3" />

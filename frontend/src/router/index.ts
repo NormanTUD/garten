@@ -50,6 +50,12 @@ const routes = [
 	  component: () => import("@/views/MessagesView.vue"),
 		  meta: { requiresAuth: true },
   },
+  {
+    path: "/duty",
+    name: "duty",
+    component: () => import("@/views/DutyView.vue"),
+    meta: { requiresAuth: true },
+  },
 
 ];
 

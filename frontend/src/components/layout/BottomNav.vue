@@ -21,6 +21,11 @@ const auth = useAuthStore();
       <span>Finanzen</span>
     </v-btn>
 
+    <v-btn to="/duty" value="duty">
+      <v-icon>mdi-shovel</v-icon>
+      <span>Stunden</span>
+    </v-btn>
+
     <v-btn to="/harvest" value="harvest">
       <v-icon>mdi-basket</v-icon>
       <span>Ernte</span>
@@ -32,3 +37,4 @@ const auth = useAuthStore();
     </v-btn>
   </v-bottom-navigation>
 </template>
+
