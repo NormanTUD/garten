@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "@/stores/auth";
+
+const router = useRouter();
+const auth = useAuthStore();
 
 // Login-Felder
-const email = ref("");
+const username = ref("");
 const password = ref("");
+const showPassword = ref(false);
 
 // PWA-Installationslogik
 const deferredPrompt = ref<any>(null);
@@ -34,9 +40,11 @@ onUnmounted(() => {
 });
 
 // Login-Handler
-function handleLogin() {
-  console.log("Login attempted with:", email.value, password.value);
-  // Hier kannst du die Login-Logik hinzufügen
+async function handleLogin() {
+  const success = await auth.login(username.value, password.value);
+  if (success) {
+    router.push("/");
+  }
 }
 </script>
 
@@ -56,26 +64,46 @@ function handleLogin() {
           </v-card-title>
 
           <v-card-text>
+            <!-- Error Banner -->
+            <v-alert
+              v-if="auth.error"
+              type="error"
+              variant="tonal"
+              class="mb-4"
+              closable
+            >
+              {{ auth.error }}
+            </v-alert>
+
             <!-- Login-Formular -->
             <v-form @submit.prevent="handleLogin">
               <v-text-field
-                v-model="email"
-                label="E-Mail"
-                type="email"
+                v-model="username"
+                label="Benutzername"
+                prepend-inner-icon="mdi-account"
                 required
-                outlined
-                dense
+                class="mb-2"
               />
               <v-text-field
                 v-model="password"
                 label="Passwort"
-                type="password"
+                :type="showPassword ? 'text' : 'password'"
+                prepend-inner-icon="mdi-lock"
+                :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                @click:append-inner="showPassword = !showPassword"
                 required
-                outlined
-                dense
+                class="mb-2"
               />
-              <v-btn type="submit" color="primary" block>
-                Login
+              <v-btn
+                type="submit"
+                color="primary"
+                block
+                size="large"
+                :loading="auth.loading"
+                :disabled="!username || !password"
+              >
+                <v-icon start icon="mdi-login" />
+                Anmelden
               </v-btn>
             </v-form>
           </v-card-text>
@@ -84,6 +112,7 @@ function handleLogin() {
           <v-btn
             v-if="showInstallBtn"
             color="primary"
+            variant="tonal"
             block
             class="mt-4"
             @click="installPwa"
@@ -96,4 +125,3 @@ function handleLogin() {
     </v-row>
   </v-container>
 </template>
-
