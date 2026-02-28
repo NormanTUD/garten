@@ -93,7 +93,7 @@ async def test_create_user_as_normal_user_forbidden(client: AsyncClient, normal_
 
 """
 async def test_create_user_invalid_username_rejected(client: AsyncClient, admin_user):
-    """Username must match pattern ^[a-zA-Z0-9_-]+$"""
+    " ""Username must match pattern ^[a-zA-Z0-9_-]+$"" "
     _, token = admin_user
     response = await client.post(
         "/api/users/",
