@@ -1,20 +1,42 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRouter } from "vue-router";
-import { useAuthStore } from "@/stores/auth";
+import { ref, onMounted, onUnmounted } from "vue";
 
-const auth = useAuthStore();
-const router = useRouter();
-
-const username = ref("");
+// Login-Felder
+const email = ref("");
 const password = ref("");
-const showPassword = ref(false);
 
-async function handleLogin() {
-  const success = await auth.login(username.value, password.value);
-  if (success) {
-    router.push({ name: "dashboard" });
+// PWA-Installationslogik
+const deferredPrompt = ref<any>(null);
+const showInstallBtn = ref(false);
+
+function onBeforeInstallPrompt(e: Event) {
+  e.preventDefault();
+  deferredPrompt.value = e;
+  showInstallBtn.value = true;
+}
+
+async function installPwa() {
+  if (!deferredPrompt.value) return;
+  deferredPrompt.value.prompt();
+  const { outcome } = await deferredPrompt.value.userChoice;
+  if (outcome === "accepted") {
+    showInstallBtn.value = false;
   }
+  deferredPrompt.value = null;
+}
+
+onMounted(() => {
+  window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+});
+
+// Login-Handler
+function handleLogin() {
+  console.log("Login attempted with:", email.value, password.value);
+  // Hier kannst du die Login-Logik hinzufügen
 }
 </script>
 
@@ -34,52 +56,41 @@ async function handleLogin() {
           </v-card-title>
 
           <v-card-text>
+            <!-- Login-Formular -->
             <v-form @submit.prevent="handleLogin">
               <v-text-field
-                v-model="username"
-                label="Benutzername"
-                prepend-inner-icon="mdi-account"
-                autocomplete="username"
-                :disabled="auth.loading"
-                class="mb-2"
+                v-model="email"
+                label="E-Mail"
+                type="email"
+                required
+                outlined
+                dense
               />
-
               <v-text-field
                 v-model="password"
                 label="Passwort"
-                prepend-inner-icon="mdi-lock"
-                :type="showPassword ? 'text' : 'password'"
-                :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                autocomplete="current-password"
-                :disabled="auth.loading"
-                class="mb-4"
-                @click:append-inner="showPassword = !showPassword"
+                type="password"
+                required
+                outlined
+                dense
               />
-
-              <v-alert
-                v-if="auth.error"
-                type="error"
-                variant="tonal"
-                class="mb-4"
-                closable
-                @click:close="auth.error = null"
-              >
-                {{ auth.error }}
-              </v-alert>
-
-              <v-btn
-                type="submit"
-                color="primary"
-                size="large"
-                block
-                :loading="auth.loading"
-                :disabled="!username || !password"
-              >
-                <v-icon start icon="mdi-login" />
-                Anmelden
+              <v-btn type="submit" color="primary" block>
+                Login
               </v-btn>
             </v-form>
           </v-card-text>
+
+          <!-- PWA Install Button -->
+          <v-btn
+            v-if="showInstallBtn"
+            color="primary"
+            block
+            class="mt-4"
+            @click="installPwa"
+          >
+            <v-icon start icon="mdi-download" />
+            App installieren
+          </v-btn>
         </v-card>
       </v-col>
     </v-row>
