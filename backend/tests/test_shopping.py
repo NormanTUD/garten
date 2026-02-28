@@ -220,7 +220,7 @@ class TestShoppingDeletePurchased:
     async def test_delete_purchased_item_removes_expense(
         self, user_client: AsyncClient,
     ):
-        """Deleting a purchased item should also delete the finance entry."""
+        " ""Deleting a purchased item should also delete the finance entry."" "
         # Create and purchase
         resp = await user_client.post("/api/shopping/", json={
             "title": "Schlauch",
