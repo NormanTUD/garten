@@ -80,19 +80,17 @@ interface MemberBalance {
   display_name: string;
   total_paid_cents: number;
   total_standing_order_cents: number;
-  total_standing_order_projected_cents: number;  // NEU
+  total_standing_order_projected_cents: number;
   total_income_cents: number;
-  total_income_projected_cents: number;          // NEU
+  total_income_projected_cents: number;
   share_recurring_cents: number;
   share_onetime_cents: number;
   share_total_cents: number;
   remaining_cents: number;
-  remaining_projected_cents: number;             // NEU
+  remaining_projected_cents: number;
 }
 
 interface FundOverview {
-  total_standing_order_projected_cents: number;  // NEU
-  total_income_projected_cents: number;          // NEU
   total_recurring_monthly_cents: number;
   total_recurring_yearly_cents: number;
   total_recurring_annual_cents: number;
@@ -100,7 +98,9 @@ interface FundOverview {
   total_costs_annual_cents: number;
   total_payments_cents: number;
   total_standing_order_cents: number;
+  total_standing_order_projected_cents: number;
   total_income_cents: number;
+  total_income_projected_cents: number;
   fund_balance_cents: number;
   share_recurring_per_member_annual_cents: number;
   share_recurring_per_member_monthly_cents: number;
@@ -535,7 +535,7 @@ function isMonthCompleted(month: number): boolean {
   const now = new Date();
   if (selectedYear.value < now.getFullYear()) return true;
   if (selectedYear.value > now.getFullYear()) return false;
-  return month < now.getMonth() + 1; // Current month is NOT completed
+  return month < now.getMonth() + 1;
 }
 </script>
 
