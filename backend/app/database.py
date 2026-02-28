@@ -67,6 +67,7 @@ async def create_all_tables() -> None:
     from app.plants import models as _plants  # noqa: F401
     from app.watering import models as _watering  # noqa: F401
     from app.duty import models as _duty  # noqa: F401  ← NEU
+    from app.shopping import models as _shopping  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

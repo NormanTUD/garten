@@ -79,7 +79,9 @@ def setup_routers(app: FastAPI) -> None:
     from app.plants.router import router as plants_router
     from app.watering.router import fertilizing_router, watering_router
     from app.duty.router import router as duty_router
+    from app.shopping.router import router as shopping_router
 
+    app.include_router(shopping_router)
     app.include_router(duty_router)
     app.include_router(auth_router)
     app.include_router(user_router)

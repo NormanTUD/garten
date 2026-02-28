@@ -34,6 +34,10 @@ const auth = useAuthStore();
       <span>Ernte</span>
     </v-btn>
     -->
+	<v-btn to="/shopping" value="shopping">
+	  <v-icon icon="mdi-cart" />
+	  <span>Einkauf</span>
+	</v-btn>
 
     <v-btn v-if="auth.isAdmin" to="/admin" value="admin">
       <v-icon>mdi-cog</v-icon>
