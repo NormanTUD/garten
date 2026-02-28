@@ -809,10 +809,12 @@ async function confirmExpense(id: number) {
                 </v-avatar>
                 <v-avatar v-else color="primary" variant="tonal" size="48"><v-icon icon="mdi-receipt" /></v-avatar>
               </template>
-              <template #title>
+	      <template #title>
                 <span class="font-weight-bold">{{ e.description }}</span>
                 <v-chip v-if="e.category" size="x-small" class="ml-2" variant="tonal">{{ e.category.icon || '' }} {{ e.category.name }}</v-chip>
                 <v-chip v-if="!e.is_shared" size="x-small" class="ml-1" color="warning" variant="flat">nicht umgelegt</v-chip>
+                <v-chip v-if="e.is_shared && !e.confirmed_by_admin" size="x-small" color="warning" variant="flat" class="ml-1">⏳ Bestätigung ausstehend</v-chip>
+                <v-chip v-if="e.is_shared && e.confirmed_by_admin" size="x-small" color="success" variant="flat" class="ml-1">✓ Bestätigt</v-chip>
               </template>
               <template #subtitle>
                 {{ new Date(e.expense_date).toLocaleDateString('de-DE') }} · {{ e.user.display_name }}
@@ -821,9 +823,21 @@ async function confirmExpense(id: number) {
               <template #append>
                 <div class="text-right">
                   <div class="text-body-1 font-weight-bold text-primary">{{ eur(e.amount_cents) }}</div>
-                  <v-btn v-if="auth.isAdmin" size="x-small" icon="mdi-delete" variant="text" color="error" @click="deleteExpense(e.id)" />
+                  <div class="d-flex ga-1 justify-end mt-1">
+                    <v-btn
+                      v-if="auth.isAdmin && e.is_shared && !e.confirmed_by_admin"
+                      size="x-small"
+                      color="success"
+                      variant="tonal"
+                      @click.stop="confirmExpense(e.id)"
+                    >
+                      ✓ Bestätigen
+                    </v-btn>
+                    <v-btn v-if="auth.isAdmin" size="x-small" icon="mdi-delete" variant="text" color="error" @click="deleteExpense(e.id)" />
+                  </div>
                 </div>
               </template>
+
             </v-list-item>
           </v-list>
         </v-window-item>
