@@ -163,16 +163,18 @@ class MemberBalance(BaseModel):
     user_id: int
     display_name: str
     total_paid_cents: int
-    total_standing_order_cents: int  # NEU
-    total_income_cents: int          # NEU: paid + standing orders
+    total_standing_order_cents: int       # Actual (completed months only)
+    total_standing_order_projected_cents: int  # NEU: Full year projection
+    total_income_cents: int               # Actual
+    total_income_projected_cents: int     # NEU: Projected
     share_recurring_cents: int
     share_onetime_cents: int
     share_total_cents: int
-    remaining_cents: int
-
+    remaining_cents: int                  # Based on actual
+    remaining_projected_cents: int        # NEU: Based on projected
 
 class GardenFundOverview(BaseModel):
-    # Laufende Kosten
+    # Laufende Kosten (projected = full year)
     total_recurring_monthly_cents: int
     total_recurring_yearly_cents: int
     total_recurring_annual_cents: int
@@ -180,13 +182,15 @@ class GardenFundOverview(BaseModel):
     # Einmal-Ausgaben
     total_onetime_expenses_cents: int
 
-    # Gesamt
+    # Gesamt (projected)
     total_costs_annual_cents: int
 
-    # Zahlungen
+    # Zahlungen (actual)
     total_payments_cents: int
-    total_standing_order_cents: int  # NEU
-    total_income_cents: int          # NEU: payments + standing orders
+    total_standing_order_cents: int           # Actual
+    total_standing_order_projected_cents: int  # NEU
+    total_income_cents: int                   # Actual
+    total_income_projected_cents: int         # NEU
     fund_balance_cents: int
 
     # Pro Mitglied

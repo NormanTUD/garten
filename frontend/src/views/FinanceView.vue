@@ -80,14 +80,19 @@ interface MemberBalance {
   display_name: string;
   total_paid_cents: number;
   total_standing_order_cents: number;
+  total_standing_order_projected_cents: number;  // NEU
   total_income_cents: number;
+  total_income_projected_cents: number;          // NEU
   share_recurring_cents: number;
   share_onetime_cents: number;
   share_total_cents: number;
   remaining_cents: number;
+  remaining_projected_cents: number;             // NEU
 }
 
 interface FundOverview {
+  total_standing_order_projected_cents: number;  // NEU
+  total_income_projected_cents: number;          // NEU
   total_recurring_monthly_cents: number;
   total_recurring_yearly_cents: number;
   total_recurring_annual_cents: number;
@@ -525,6 +530,13 @@ async function unconfirmExpense(id: number) {
   await api.patch(`/finance/expenses/${id}/unconfirm`);
   await loadAll();
 }
+
+function isMonthCompleted(month: number): boolean {
+  const now = new Date();
+  if (selectedYear.value < now.getFullYear()) return true;
+  if (selectedYear.value > now.getFullYear()) return false;
+  return month < now.getMonth() + 1; // Current month is NOT completed
+}
 </script>
 
 <template>
@@ -545,18 +557,30 @@ async function unconfirmExpense(id: number) {
       <!-- ═══ My Balance ═══════════════════════════════════════ -->
       <v-card v-if="myBalance" :color="balanceColor(myBalance.remaining_cents)" variant="tonal" class="mb-4">
         <v-card-text class="text-center pa-4">
-          <div class="text-body-1">Dein Stand {{ selectedYear }}</div>
+          <div class="text-body-1">Dein Stand {{ selectedYear }} (bisher)</div>
           <div class="text-h3 font-weight-bold my-2">{{ eur(Math.abs(myBalance.remaining_cents)) }}</div>
           <div class="text-body-1">{{ balanceText(myBalance.remaining_cents) }}</div>
           <div class="text-caption mt-1">
-            Soll: {{ eur(myBalance.share_total_cents) }} · Bezahlt: {{ eur(myBalance.total_paid_cents) }}
-            · Daueraufträge: {{ eur(myBalance.total_standing_order_cents) }}
+            Soll: {{ eur(myBalance.share_total_cents) }} ·
+            Bezahlt: {{ eur(myBalance.total_paid_cents) }} ·
+            Daueraufträge (abgeschlossen): {{ eur(myBalance.total_standing_order_cents) }}
           </div>
-          <div class="text-caption">
-            ({{ eur(myBalance.share_recurring_cents) }} laufend + {{ eur(myBalance.share_onetime_cents) }} Einmal-Umlagen)
+
+          <!-- Prognose -->
+          <v-divider class="my-2" />
+          <div class="text-caption text-medium-emphasis">
+            Prognose Ende {{ selectedYear }}
+            (inkl. zukünftiger Daueraufträge):
+            <strong :class="myBalance.remaining_projected_cents <= 0 ? 'text-success' : 'text-error'">
+              {{ myBalance.remaining_projected_cents <= 0 ? 'ausgeglichen ✓' : eur(myBalance.remaining_projected_cents) + ' offen' }}
+            </strong>
+          </div>
+          <div class="text-caption text-medium-emphasis">
+            Daueraufträge geplant (ganzes Jahr): {{ eur(myBalance.total_standing_order_projected_cents) }}
           </div>
         </v-card-text>
       </v-card>
+
 
       <!-- ═══ Fund Summary ═════════════════════════════════════ -->
       <v-card class="mb-4" v-if="fund">
@@ -763,15 +787,24 @@ async function unconfirmExpense(id: number) {
 
         <!-- All members -->
         <v-divider />
-        <v-card-text class="pt-2 pb-3">
-          <div class="text-caption text-medium-emphasis mb-2">Alle Mitglieder ({{ fund.member_count }})</div>
-          <v-chip v-for="b in fund.member_balances" :key="b.user_id" :color="balanceColor(b.remaining_cents)"
+	<v-card-text class="pt-2 pb-3">
+          <div class="text-caption text-medium-emphasis mb-2">
+            Alle Mitglieder ({{ fund.member_count }}) – Stand: abgeschlossene Monate
+          </div>
+          <v-chip v-for="b in fund.member_balances" :key="b.user_id"
+            :color="balanceColor(b.remaining_cents)"
             variant="tonal" class="mr-2 mb-1" size="small">
             {{ b.display_name }}:
-            <strong class="ml-1">{{ b.remaining_cents > 0 ? '-' : '+' }}{{ eur(Math.abs(b.remaining_cents)) }}</strong>
-            <span v-if="b.total_standing_order_cents > 0" class="ml-1 text-caption">(DA: {{ eur(b.total_standing_order_cents) }})</span>
+            <strong class="ml-1">
+              {{ b.remaining_cents > 0 ? '-' : '+' }}{{ eur(Math.abs(b.remaining_cents)) }}
+            </strong>
+            <span v-if="b.total_standing_order_projected_cents > b.total_standing_order_cents"
+              class="ml-1 text-caption">
+              (→ {{ eur(Math.abs(b.remaining_projected_cents)) }} Prognose)
+            </span>
           </v-chip>
         </v-card-text>
+
       </v-card>
 
       <!-- ═══ Quick Action Buttons ═════════════════════════════ -->
@@ -911,29 +944,43 @@ async function unconfirmExpense(id: number) {
 
             <!-- Month grid -->
             <v-card-text>
-              <div class="d-flex flex-wrap ga-1">
-                <template v-for="month in 12" :key="month">
-                  <v-chip
-                    v-if="orderActiveInMonth(order, month)"
-                    :color="isMonthSkipped(order, month) ? 'error' : 'success'"
-                    :variant="isMonthSkipped(order, month) ? 'flat' : 'tonal'"
-                    size="small"
-                    :style="{ cursor: auth.isAdmin ? 'pointer' : 'default' }"
-                    @click="auth.isAdmin && (isMonthSkipped(order, month) ? removeSkip(order.id, getSkipId(order, month)!) : openSkipDialog(order))"
-                  >
-                    {{ monthNames[month - 1] }}
-                    <v-icon v-if="isMonthSkipped(order, month)" end icon="mdi-close" size="x-small" />
-                    <v-icon v-else end icon="mdi-check" size="x-small" />
-                  </v-chip>
-                  <v-chip v-else size="small" variant="outlined" color="grey" disabled>
-                    {{ monthNames[month - 1] }}
-                  </v-chip>
-                </template>
-              </div>
-              <div class="text-caption text-medium-emphasis mt-2">
-                Grün = gezahlt · Rot = nicht gezahlt
-                <span v-if="auth.isAdmin"> · Klicken zum Umschalten</span>
-              </div>
+	    <div class="d-flex flex-wrap ga-1">
+              <template v-for="month in 12" :key="month">
+                <v-chip
+                  v-if="orderActiveInMonth(order, month)"
+                  :color="isMonthSkipped(order, month)
+                    ? 'error'
+                    : isMonthCompleted(month)
+                      ? 'success'
+                      : 'blue-grey'"
+                  :variant="isMonthSkipped(order, month)
+                    ? 'flat'
+                    : isMonthCompleted(month)
+                      ? 'tonal'
+                      : 'outlined'"
+                  size="small"
+                  :style="{ cursor: auth.isAdmin ? 'pointer' : 'default' }"
+                  @click="auth.isAdmin && (isMonthSkipped(order, month)
+                    ? removeSkip(order.id, getSkipId(order, month)!)
+                    : openSkipDialog(order))"
+                >
+                  {{ monthNames[month - 1] }}
+                  <v-icon v-if="isMonthSkipped(order, month)" end icon="mdi-close" size="x-small" />
+                  <v-icon v-else-if="isMonthCompleted(month)" end icon="mdi-check" size="x-small" />
+                  <v-icon v-else end icon="mdi-clock-outline" size="x-small" />
+                </v-chip>
+                <v-chip v-else size="small" variant="outlined" color="grey" disabled>
+                  {{ monthNames[month - 1] }}
+                </v-chip>
+              </template>
+            </div>
+            <div class="text-caption text-medium-emphasis mt-2">
+              Grün = gezahlt (Monat abgeschlossen) ·
+              Grau umrandet = geplant (Monat noch nicht rum) ·
+              Rot = nicht gezahlt
+              <span v-if="auth.isAdmin"> · Klicken zum Umschalten</span>
+            </div>
+
             </v-card-text>
           </v-card>
         </v-window-item>
