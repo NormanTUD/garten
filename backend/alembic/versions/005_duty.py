@@ -1,14 +1,14 @@
 """garden duty system
 
 Revision ID: 007
-Revises: 006
+Revises: 005
 Create Date: 2026-02-28
 """
 from alembic import op
 import sqlalchemy as sa
 
-revision = "007"
-down_revision = "006"
+revision = "005"
+down_revision = "004"
 branch_labels = None
 depends_on = None
 
