@@ -122,32 +122,75 @@ onMounted(async () => {
     <!-- ═══ My Finance Status ══════════════════════════════════ -->
     <v-card
       v-if="myBalance"
-      :color="balanceColor(myBalance.remaining_cents)"
+      :color="balanceColor(myBalance.remaining_projected_cents)"
       variant="tonal"
       class="mb-6"
       to="/finance"
     >
-      <v-card-text class="d-flex align-center pa-4">
-        <div class="flex-grow-1">
-          <div class="text-body-2 text-medium-emphasis">Dein Kassenstand {{ new Date().getFullYear() }}</div>
-          <div class="text-h4 font-weight-bold my-1">
-            {{ eur(Math.abs(myBalance.remaining_cents)) }}
+      <v-card-text class="pa-4">
+        <div class="d-flex align-center mb-3">
+          <div class="flex-grow-1">
+            <div class="text-body-2 text-medium-emphasis">Deine Finanzen {{ new Date().getFullYear() }}</div>
           </div>
-          <div class="text-body-2">{{ balanceText(myBalance.remaining_cents) }}</div>
-          <div class="text-caption mt-1">
-            Soll: {{ eur(myBalance.share_total_cents) }}
-            · Bezahlt: {{ eur(myBalance.total_paid_cents) }}
-            · Daueraufträge: {{ eur(myBalance.total_standing_order_cents) }}
-          </div>
-          <div v-if="myBalance.duty_compensation_cents > 0" class="text-caption">
-            + {{ eur(myBalance.duty_compensation_cents) }} Ausgleich Gartenstunden
-          </div>
+          <v-icon icon="mdi-cash-register" size="36" />
         </div>
-        <div class="text-right">
-          <v-icon icon="mdi-cash-register" size="48" class="mb-2" />
-          <div class="text-caption">
-            {{ eur(fund!.share_recurring_per_member_monthly_cents) }} / Monat
-          </div>
+
+        <!-- ─── Aufschlüsselung Soll ──────────────────────── -->
+        <div class="text-body-2 font-weight-bold mb-1">
+          <v-icon icon="mdi-arrow-up" size="small" class="mr-1" />
+          Dein Jahres-Soll
+        </div>
+        <v-table density="compact" class="mb-3 bg-transparent">
+          <tbody>
+            <tr>
+              <td class="pl-0">Laufende Kosten (dein Anteil)</td>
+              <td class="text-right pr-0">{{ eur(myBalance.share_recurring_cents) }}</td>
+            </tr>
+            <tr v-if="myBalance.share_onetime_cents > 0">
+              <td class="pl-0">Einmal-Umlagen</td>
+              <td class="text-right pr-0">{{ eur(myBalance.share_onetime_cents) }}</td>
+            </tr>
+            <tr v-if="myBalance.duty_compensation_cents > 0">
+              <td class="pl-0">Ausgleich Gartenstunden</td>
+              <td class="text-right pr-0 text-error">+ {{ eur(myBalance.duty_compensation_cents) }}</td>
+            </tr>
+            <tr class="font-weight-bold">
+              <td class="pl-0">Gesamt-Soll</td>
+              <td class="text-right pr-0">{{ eur(myBalance.share_total_cents) }}</td>
+            </tr>
+          </tbody>
+        </v-table>
+
+        <!-- ─── Aufschlüsselung Haben ─────────────────────── -->
+        <div class="text-body-2 font-weight-bold mb-1">
+          <v-icon icon="mdi-arrow-down" size="small" class="mr-1" />
+          Bisher eingezahlt
+        </div>
+        <v-table density="compact" class="mb-3 bg-transparent">
+          <tbody>
+            <tr v-if="myBalance.total_paid_cents > 0">
+              <td class="pl-0">Manuelle Einzahlungen</td>
+              <td class="text-right pr-0 text-success">{{ eur(myBalance.total_paid_cents) }}</td>
+            </tr>
+            <tr>
+              <td class="pl-0">Daueraufträge (bisher abgebucht)</td>
+              <td class="text-right pr-0 text-success">{{ eur(myBalance.total_standing_order_cents) }}</td>
+            </tr>
+            <tr class="font-weight-bold">
+              <td class="pl-0">Gesamt eingezahlt</td>
+              <td class="text-right pr-0 text-success">{{ eur(myBalance.total_income_cents) }}</td>
+            </tr>
+          </tbody>
+        </v-table>
+
+        <!-- ─── Aktueller Stand ────────────────────────────── -->
+        <v-divider class="mb-3" />
+        <div class="d-flex justify-space-between align-center mb-1">
+          <span class="text-body-2 font-weight-bold">Aktuell offen</span>
+          <span class="text-h6 font-weight-bold" :class="myBalance.remaining_cents > 0 ? 'text-error' : 'text-success'">
+            {{ myBalance.remaining_cents > 0 ? '' : '+' }}{{ eur(myBalance.remaining_cents > 0 ? myBalance.remaining_cents : Math.abs(myBalance.remaining_cents)) }}
+            <span class="text-body-2">{{ myBalance.remaining_cents > 0 ? 'offen' : 'Guthaben' }}</span>
+          </span>
         </div>
       </v-card-text>
 
@@ -157,6 +200,11 @@ onMounted(async () => {
         <div class="text-body-2 font-weight-bold mb-2">
           <v-icon icon="mdi-crystal-ball" size="small" class="mr-1" />
           Prognose Ende {{ new Date().getFullYear() }}
+        </div>
+
+        <div class="text-caption mb-2">
+          Daueraufträge geplant (ganzes Jahr): {{ eur(myBalance.total_standing_order_projected_cents) }}
+          · Gesamt-Prognose: {{ eur(myBalance.total_income_projected_cents) }}
         </div>
 
         <!-- Prognose: alles gedeckt -->
@@ -172,18 +220,22 @@ onMounted(async () => {
 
         <!-- Prognose: noch offen -->
         <template v-else>
-          <v-chip color="error" variant="tonal" size="small" class="mr-2 mb-2">
+          <v-chip color="error" variant="tonal" size="small" class="mb-2">
             <v-icon icon="mdi-alert" start size="small" />
             {{ eur(myBalance.remaining_projected_cents) }} offen Ende Jahr
           </v-chip>
 
-          <div class="text-body-2 mt-1">
+          <div class="text-body-2 mt-2">
             <v-icon icon="mdi-lightbulb-outline" size="small" class="mr-1" />
             <strong>Empfehlung:</strong>
-            Erhöhe deinen monatlichen Abschlag um
-            <strong>{{ eur(Math.ceil(myBalance.remaining_projected_cents / monthsRemaining / 100) * 100) }}</strong>,
-            oder zahle einmalig
-            <strong>{{ eur(myBalance.remaining_projected_cents) }}</strong> ein.
+          </div>
+          <div class="text-body-2 ml-6">
+            • Abschlag erhöhen um
+            <strong>{{ eur(Math.ceil(myBalance.remaining_projected_cents / monthsRemaining / 100) * 100) }}/Monat</strong>
+            ({{ monthsRemaining }} Monate übrig)
+          </div>
+          <div class="text-body-2 ml-6">
+            • Oder einmalig <strong>{{ eur(myBalance.remaining_projected_cents) }}</strong> einzahlen
           </div>
         </template>
       </v-card-text>
