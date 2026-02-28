@@ -29,9 +29,9 @@ class ShoppingItem(Base):
     purchased_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     purchased_at = Column(DateTime(timezone=True), nullable=True)
     cost_cents = Column(Integer, nullable=True)  # Preis in Cent
-    expense_id = Column(Integer, ForeignKey("expenses.id"), nullable=True)  # Link zur Finanz-Buchung
+    expense_id = Column(Integer, ForeignKey("garden_expenses.id"), nullable=True)
 
     added_by = relationship("User", foreign_keys=[added_by_id], lazy="joined")
     purchased_by = relationship("User", foreign_keys=[purchased_by_id], lazy="joined")
-    expense = relationship("Expense", lazy="joined")
+    expense = relationship("GardenExpense", lazy="joined")
 
