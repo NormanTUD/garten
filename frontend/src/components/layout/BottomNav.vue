@@ -26,10 +26,12 @@ const auth = useAuthStore();
       <span>Stunden</span>
     </v-btn>
 
+    <!--
     <v-btn to="/harvest" value="harvest">
       <v-icon>mdi-basket</v-icon>
       <span>Ernte</span>
     </v-btn>
+    -->
 
     <v-btn v-if="auth.isAdmin" to="/admin" value="admin">
       <v-icon>mdi-cog</v-icon>
