@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload
 
 from app.shopping.models import ShoppingItem
 from app.shopping.schemas import ShoppingItemCreate, ShoppingItemUpdate, ShoppingItemPurchase
-from app.finance.models import GardenExpense
+from app.finance.models import GardenExpense, MemberPayment
 
 
 async def get_items(db: AsyncSession, include_purchased: bool = False):
@@ -66,7 +66,7 @@ async def purchase_item(
     if not item or item.purchased:
         return None
 
-    # 1. Finanzbuchung erstellen (Einmal-Ausgabe)
+    # 1. Ausgabe erstellen (wird auf alle umgelegt)
     expense = GardenExpense(
         user_id=user_id,
         description=f"Einkauf: {item.title}" + (f" ({item.quantity})" if item.quantity else ""),
@@ -80,7 +80,21 @@ async def purchase_item(
     db.add(expense)
     await db.flush()
 
-    # 2. Item als gekauft markieren
+    # 2. Gutschrift für den Käufer (wird ihm angerechnet)
+    payment = MemberPayment(
+        user_id=user_id,
+        for_user_id=user_id,
+        amount_cents=data.cost_cents,
+        payment_type="expense_refund",
+        description=f"Einkauf: {item.title}" + (f" ({item.quantity})" if item.quantity else ""),
+        payment_date=date.today(),
+        confirmed_by_admin=False,
+        notes=f"Automatisch aus Einkaufsliste",
+    )
+    db.add(payment)
+    await db.flush()
+
+    # 3. Item als gekauft markieren
     item.purchased = True
     item.purchased_by_id = user_id
     item.purchased_at = datetime.utcnow()
@@ -90,17 +104,31 @@ async def purchase_item(
     await db.flush()
     return item
 
-
 async def unpurchase_item(db: AsyncSession, item_id: int):
     item = await get_item(db, item_id)
     if not item or not item.purchased:
         return None
 
-    # Finanzbuchung löschen
+    # Finanzbuchung (Ausgabe) löschen
     if item.expense_id:
-        expense = await db.get(Expense, item.expense_id)
+        expense = await db.get(GardenExpense, item.expense_id)
         if expense:
             await db.delete(expense)
+
+    # Gutschrift (MemberPayment) löschen
+    from sqlalchemy import select, and_
+    q = select(MemberPayment).where(
+        and_(
+            MemberPayment.user_id == item.purchased_by_id,
+            MemberPayment.amount_cents == item.cost_cents,
+            MemberPayment.payment_type == "expense_refund",
+            MemberPayment.description.contains(item.title),
+        )
+    )
+    result = await db.execute(q)
+    payment = result.scalar_one_or_none()
+    if payment:
+        await db.delete(payment)
 
     item.purchased = False
     item.purchased_by_id = None
@@ -111,19 +139,32 @@ async def unpurchase_item(db: AsyncSession, item_id: int):
     await db.flush()
     return item
 
-
 async def delete_item(db: AsyncSession, item_id: int):
     item = await get_item(db, item_id)
     if not item:
         return False
 
-    # Falls gekauft, auch die Finanzbuchung löschen
-    if item.expense_id:
-        expense = await db.get(Expense, item.expense_id)
-        if expense:
-            await db.delete(expense)
+    # Falls gekauft, Ausgabe + Gutschrift löschen
+    if item.purchased:
+        if item.expense_id:
+            expense = await db.get(GardenExpense, item.expense_id)
+            if expense:
+                await db.delete(expense)
+
+        from sqlalchemy import select, and_
+        q = select(MemberPayment).where(
+            and_(
+                MemberPayment.user_id == item.purchased_by_id,
+                MemberPayment.amount_cents == item.cost_cents,
+                MemberPayment.payment_type == "expense_refund",
+                MemberPayment.description.contains(item.title),
+            )
+        )
+        result = await db.execute(q)
+        payment = result.scalar_one_or_none()
+        if payment:
+            await db.delete(payment)
 
     await db.delete(item)
     await db.flush()
     return True
-
