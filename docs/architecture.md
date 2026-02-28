@@ -34,193 +34,184 @@ hat keine Sonderbehandlung.
 
 ```
 gartenapp/
+├── apache
+│   ├── certs
+│   ├── Dockerfile
+│   ├── gartenapp.conf
+│   └── gartenapp-dev.conf
+├── backend
+│   ├── alembic
+│   │   ├── env.py
+│   │   ├── script.py.mako
+│   │   └── versions
+│   │       ├── 001_initial_schema.py
+│   │       ├── 002_harvest_watering_fertilizing.py
+│   │       ├── 003_finance.py
+│   │       ├── 004_messaging.py
+│   │       └── 005_duty.py
+│   ├── alembic.ini
+│   ├── app
+│   │   ├── audit
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   ├── auth
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   ├── service.py
+│   │   │   └── utils.py
+│   │   ├── beds
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── dependencies.py
+│   │   ├── duty
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   ├── finance
+│   │   │   ├── balance_calculator.py
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   ├── garden
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   ├── harvest
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   ├── __init__.py
+│   │   ├── main.py
+│   │   ├── messaging
+│   │   │   ├── default_rules.py
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   ├── middleware
+│   │   │   └── audit_log.py
+│   │   ├── plants
+│   │   │   ├── __init__.py
+│   │   │   ├── models.py
+│   │   │   ├── router.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   └── watering
+│   │       ├── __init__.py
+│   │       ├── models.py
+│   │       ├── router.py
+│   │       ├── schemas.py
+│   │       └── service.py
+│   ├── Dockerfile
+│   ├── pyproject.toml
+│   └── tests
+│       ├── conftest.py
+│       ├── __init__.py
+│       ├── test_audit.py
+│       ├── test_auth.py
+│       ├── test_beds.py
+│       ├── test_duty.py
+│       ├── test_edge_cases.py
+│       ├── test_finance.py
+│       ├── test_garden.py
+│       ├── test_harvest.py
+│       ├── test_health.py
+│       ├── test_messaging.py
+│       ├── test_plants.py
+│       ├── test_users.py
+│       └── test_watering.py
+├── build
+├── build_dev
+├── delete_and_rebuild
+├── docker-compose.dev.yml
+├── docker-compose.override.yml
 ├── docker-compose.yml
-├── .github/
-│   └── workflows/
-│       ├── backend-ci.yml
-│       └── frontend-ci.yml
-├── backend/
-│   ├── Dockerfile
-│   ├── pyproject.toml
-│   ├── alembic/
-│   │   ├── alembic.ini
-│   │   ├── env.py
-│   │   └── versions/
-│   │       ├── 001_users_auth.py
-│   │       ├── 002_garden_beds_plants.py
-│   │       ├── 003_finance.py
-│   │       ├── 004_harvest_watering.py
-│   │       ├── 005_sensors.py
-│   │       └── 006_messaging.py
-│   ├── app/
-│   │   ├── main.py                  # FastAPI app factory
-│   │   ├── config.py                # Settings (pydantic-settings)
-│   │   ├── database.py              # Engine, session, base
-│   │   ├── dependencies.py          # Dependency injection
-│   │   ├── middleware/
-│   │   │   ├── audit_log.py         # Request/Response logging
-│   │   │   └── cors.py
-│   │   ├── auth/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   ├── models.py
-│   │   │   └── utils.py             # JWT, hashing
-│   │   ├── users/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── garden/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── beds/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── plants/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── harvest/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── watering/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── finance/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   ├── models.py
-│   │   │   └── balance_calculator.py
-│   │   ├── duty/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── sensors/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── messaging/
-│   │   │   ├── router.py
-│   │   │   ├── service.py
-│   │   │   ├── schemas.py
-│   │   │   └── models.py
-│   │   ├── backup/
-│   │   │   ├── router.py
-│   │   │   └── service.py
-│   │   ├── weather/
-│   │   │   └── service.py           # OpenWeatherMap integration
-│   │   └── ocr/
-│   │       └── service.py           # Receipt OCR (Phase 3)
-│   └── tests/
-│       ├── conftest.py
-│       ├── test_auth.py
-│       ├── test_users.py
-│       ├── test_harvest.py
-│       ├── test_watering.py
-│       ├── test_finance.py
-│       ├── test_duty.py
-│       └── test_backup.py
-├── frontend/
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── vitest.config.ts
-│   ├── playwright.config.ts
-│   ├── public/
-│   │   └── manifest.json
-│   ├── src/
-│   │   ├── main.ts
-│   │   ├── App.vue
-│   │   ├── router/
-│   │   │   └── index.ts
-│   │   ├── stores/
-│   │   │   ├── auth.ts
-│   │   │   ├── garden.ts
-│   │   │   ├── harvest.ts
-│   │   │   ├── watering.ts
-│   │   │   ├── finance.ts
-│   │   │   └── duty.ts
-│   │   ├── api/
-│   │   │   └── client.ts            # Fetch wrapper mit JWT
-│   │   ├── components/
-│   │   │   ├── layout/
-│   │   │   │   ├── AppBar.vue
-│   │   │   │   ├── NavDrawer.vue
-│   │   │   │   └── BottomNav.vue
-│   │   │   ├── garden/
-│   │   │   │   ├── GardenMap.vue
-│   │   │   │   ├── BedEditor.vue
-│   │   │   │   └── BedCard.vue
-│   │   │   ├── harvest/
-│   │   │   │   ├── HarvestForm.vue
-│   │   │   │   ├── HarvestList.vue
-│   │   │   │   └── HarvestStats.vue
-│   │   │   ├── watering/
-│   │   │   │   ├── WateringForm.vue
-│   │   │   │   ├── WateringLog.vue
-│   │   │   │   └── WateringChart.vue
-│   │   │   ├── finance/
-│   │   │   │   ├── ExpenseForm.vue
-│   │   │   │   ├── ExpenseList.vue
-│   │   │   │   ├── BalanceOverview.vue
-│   │   │   │   └── SplitCalculator.vue
-│   │   │   ├── duty/
-│   │   │   │   ├── DutyForm.vue
-│   │   │   │   └── DutyOverview.vue
-│   │   │   ├── dashboard/
-│   │   │   │   ├── DashboardMain.vue
-│   │   │   │   ├── StatCard.vue
-│   │   │   │   └── TimelineView.vue
-│   │   │   ├── admin/
-│   │   │   │   ├── UserManager.vue
-│   │   │   │   ├── AuditLogViewer.vue
-│   │   │   │   ├── AlertPanel.vue
-│   │   │   │   └── BackupManager.vue
-│   │   │   └── shared/
-│   │   │       ├── PhotoUpload.vue
-│   │   │       ├── SmartSelect.vue
-│   │   │       ├── DateTimePicker.vue
-│   │   │       └── ConfirmDialog.vue
-│   │   ├── views/
-│   │   │   ├── LoginView.vue
-│   │   │   ├── DashboardView.vue
-│   │   │   ├── GardenView.vue
-│   │   │   ├── HarvestView.vue
-│   │   │   ├── WateringView.vue
-│   │   │   ├── FinanceView.vue
-│   │   │   ├── DutyView.vue
-│   │   │   ├── CalendarView.vue
-│   │   │   ├── StatsView.vue
-│   │   │   └── AdminView.vue
-│   │   ├── composables/
-│   │   │   ├── useAuth.ts
-│   │   │   ├── useNotification.ts
-│   │   │   └── useCamera.ts
-│   │   └── ai/                      # Phase 4
-│   │       ├── plantDetector.ts
-│   │       └── models/
-│   └── tests/
-│       ├── unit/
-│       └── e2e/
-├── nginx/
-│   └── default.conf
-└── docs/
-    ├── API.md
-    ├── SETUP.md
-    └── ARCHITECTURE.md
+├── docs
+│   └── architecture.md
+├── frontend
+│   ├── Dockerfile
+│   ├── index.html
+│   ├── nginx.conf
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── public
+│   │   ├── favicon.svg
+│   │   ├── icons
+│   │   │   ├── icon-128x128.png
+│   │   │   ├── icon-144x144.png
+│   │   │   ├── icon-152x152.png
+│   │   │   ├── icon-192x192.png
+│   │   │   ├── icon-256x256.png
+│   │   │   ├── icon-384x384.png
+│   │   │   ├── icon-48x48.png
+│   │   │   ├── icon-512x512.png
+│   │   │   ├── icon-72x72.png
+│   │   │   ├── icon-96x96.png
+│   │   │   ├── icon-maskable.png
+│   │   │   ├── logo.png
+│   │   │   └── original_icon.png
+│   │   └── manifest.json
+│   ├── scripts
+│   │   └── generate-icons.sh
+│   ├── src
+│   │   ├── api
+│   │   │   └── client.ts
+│   │   ├── App.vue
+│   │   ├── components
+│   │   │   ├── layout
+│   │   │   │   ├── AppBar.vue
+│   │   │   │   ├── BottomNav.vue
+│   │   │   │   └── NavDrawer.vue
+│   │   │   └── shared
+│   │   │       └── PhotoCapture.vue
+│   │   ├── main.ts
+│   │   ├── plugins
+│   │   │   └── vuetify.ts
+│   │   ├── router
+│   │   │   └── index.ts
+│   │   ├── stores
+│   │   │   └── auth.ts
+│   │   ├── __tests__
+│   │   │   ├── api-client.test.ts
+│   │   │   └── auth-store.test.ts
+│   │   ├── views
+│   │   │   ├── AdminView.vue
+│   │   │   ├── DashboardView.vue
+│   │   │   ├── DutyView.vue
+│   │   │   ├── FinanceView.vue
+│   │   │   ├── GardenView.vue
+│   │   │   ├── HarvestView.vue
+│   │   │   ├── LoginView.vue
+│   │   │   ├── MessagesView.vue
+│   │   │   └── WateringView.vue
+│   │   └── vite-env.d.ts
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   ├── vite.config.ts
+│   └── vitest.config.ts
+├── prompt.txt
+├── README.md
+└── tests
+
 ```
 
 ---
