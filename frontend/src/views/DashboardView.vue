@@ -68,6 +68,12 @@ const myDuty = computed(() => {
   return duty.value.member_balances.find((b) => b.user_id === auth.user!.id) || null;
 });
 
+const monthsRemaining = computed(() => {
+  const now = new Date();
+  // Remaining full months including current month
+  return Math.max(12 - now.getMonth(), 1);  // getMonth() is 0-based, so Jan=0
+});
+
 function eur(cents: number): string {
   return (cents / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
 }
@@ -143,6 +149,43 @@ onMounted(async () => {
             {{ eur(fund!.share_recurring_per_member_monthly_cents) }} / Monat
           </div>
         </div>
+      </v-card-text>
+
+      <!-- ─── Prognose & Empfehlung ─────────────────────────── -->
+      <v-divider />
+      <v-card-text class="pa-4 pt-3">
+        <div class="text-body-2 font-weight-bold mb-2">
+          <v-icon icon="mdi-crystal-ball" size="small" class="mr-1" />
+          Prognose Ende {{ new Date().getFullYear() }}
+        </div>
+
+        <!-- Prognose: alles gedeckt -->
+        <template v-if="myBalance.remaining_projected_cents <= 0">
+          <v-chip color="success" variant="flat" size="small" class="mr-2">
+            <v-icon icon="mdi-check-circle" start size="small" />
+            Alles gedeckt!
+          </v-chip>
+          <span v-if="myBalance.remaining_projected_cents < 0" class="text-body-2">
+            {{ eur(Math.abs(myBalance.remaining_projected_cents)) }} Guthaben erwartet
+          </span>
+        </template>
+
+        <!-- Prognose: noch offen -->
+        <template v-else>
+          <v-chip color="error" variant="tonal" size="small" class="mr-2 mb-2">
+            <v-icon icon="mdi-alert" start size="small" />
+            {{ eur(myBalance.remaining_projected_cents) }} offen Ende Jahr
+          </v-chip>
+
+          <div class="text-body-2 mt-1">
+            <v-icon icon="mdi-lightbulb-outline" size="small" class="mr-1" />
+            <strong>Empfehlung:</strong>
+            Erhöhe deinen monatlichen Abschlag um
+            <strong>{{ eur(Math.ceil(myBalance.remaining_projected_cents / monthsRemaining / 100) * 100) }}</strong>,
+            oder zahle einmalig
+            <strong>{{ eur(myBalance.remaining_projected_cents) }}</strong> ein.
+          </div>
+        </template>
       </v-card-text>
     </v-card>
 
