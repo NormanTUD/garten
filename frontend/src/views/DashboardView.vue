@@ -38,8 +38,8 @@ interface DutyBalance {
   user_id: number;
   display_name: string;
   assigned_hours: number;
-  logged_hours: number;
   confirmed_hours: number;
+  pending_hours: number;
   remaining_hours: number;
   compensation_cents: number;
 }
@@ -171,7 +171,7 @@ onMounted(async () => {
               Erledigt! 🎉
             </div>
             <div class="text-body-2">
-              {{ myDuty.logged_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
+	      {{ myDuty.confirmed_hours + myDuty.pending_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
               <span v-if="myDuty.remaining_hours < 0">
                 · {{ Math.abs(myDuty.remaining_hours) }}h extra
               </span>
@@ -184,7 +184,7 @@ onMounted(async () => {
               {{ myDuty.remaining_hours }}h offen
             </div>
             <div class="text-body-2">
-              {{ myDuty.logged_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
+	      {{ myDuty.confirmed_hours + myDuty.pending_hours }} von {{ myDuty.assigned_hours }} Stunden geleistet
             </div>
             <div v-if="myDuty.compensation_cents > 0" class="text-caption mt-1">
               Alternativ: {{ eur(myDuty.compensation_cents) }} Ausgleich
@@ -202,7 +202,7 @@ onMounted(async () => {
 
       <!-- Progress Bar -->
       <v-progress-linear
-        :model-value="Math.min((myDuty.logged_hours / myDuty.assigned_hours) * 100, 100)"
+        :model-value="Math.min(((myDuty.confirmed_hours + myDuty.pending_hours) / myDuty.assigned_hours) * 100, 100)"
         :color="myDuty.remaining_hours <= 0 ? 'success' : 'warning'"
         height="6"
       />
