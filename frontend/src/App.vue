@@ -8,6 +8,7 @@ import BottomNav from "@/components/layout/BottomNav.vue";
 
 const route = useRoute();
 const auth = useAuthStore();
+const drawerRail = ref(false);
 
 const showLayout = computed(() => auth.isAuthenticated && route.name !== "login");
 const isOffline = ref(false);
@@ -39,6 +40,10 @@ onMounted(() => {
 function reloadApp() {
   window.location.reload();
 }
+
+function toggleDrawer() {                                         // NEU
+  drawerRail.value = !drawerRail.value;
+}
 </script>
 
 <template>
@@ -58,8 +63,8 @@ function reloadApp() {
     </v-banner>
 
     <template v-if="showLayout">
-      <AppBar />
-      <NavDrawer />
+      <AppBar @toggle-drawer="toggleDrawer" />
+      <NavDrawer v-model:rail="drawerRail" />
     </template>
 
     <v-main>
