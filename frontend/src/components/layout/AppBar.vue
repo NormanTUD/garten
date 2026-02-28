@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { useRouter } from "vue-router";
 import { api } from "@/api/client";
@@ -8,6 +8,26 @@ const auth = useAuthStore();
 const router = useRouter();
 const unreadCount = ref(0);
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+// PWA Install
+const deferredPrompt = ref<any>(null);
+const showInstallBtn = ref(false);
+
+function onBeforeInstallPrompt(e: Event) {
+  e.preventDefault();
+  deferredPrompt.value = e;
+  showInstallBtn.value = true;
+}
+
+async function installPwa() {
+  if (!deferredPrompt.value) return;
+  deferredPrompt.value.prompt();
+  const { outcome } = await deferredPrompt.value.userChoice;
+  if (outcome === "accepted") {
+    showInstallBtn.value = false;
+  }
+  deferredPrompt.value = null;
+}
 
 const emit = defineEmits<{
   (e: "toggle-drawer"): void;
@@ -24,7 +44,13 @@ async function fetchUnread() {
 
 onMounted(() => {
   fetchUnread();
-  pollInterval = setInterval(fetchUnread, 30000); // poll every 30s
+  pollInterval = setInterval(fetchUnread, 30000);
+  window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+});
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval);
+  window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
 });
 
 async function handleLogout() {
@@ -48,6 +74,18 @@ async function handleLogout() {
 
     <v-spacer />
 
+    <!-- PWA Install Button -->
+    <v-btn
+      v-if="showInstallBtn"
+      icon
+      @click="installPwa"
+      class="mr-1"
+    >
+      <v-icon icon="mdi-download" />
+      <v-tooltip activator="parent" location="bottom">App installieren</v-tooltip>
+    </v-btn>
+
+    <!-- Messages -->
     <v-btn icon @click="router.push('/messages')" class="mr-1">
       <v-badge
         v-if="unreadCount > 0"
@@ -69,4 +107,3 @@ async function handleLogout() {
     <v-btn icon="mdi-logout" @click="handleLogout" />
   </v-app-bar>
 </template>
-
