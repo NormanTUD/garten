@@ -50,6 +50,16 @@ async def purchase_item(
     return ShoppingItemRead.from_model(item)
 
 
+@router.post("/{item_id}/reset", response_model=ShoppingItemRead)
+async def reset_recurring_item(item_id: int, user: CurrentUser, db: DBSession):
+    """Reset a recurring item so it appears as 'to buy' again."""
+    item = await service.reset_recurring_item(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item nicht gefunden, nicht recurring, oder nicht gekauft")
+    await db.commit()
+    return ShoppingItemRead.from_model(item)
+
+
 @router.post("/{item_id}/unpurchase", response_model=ShoppingItemRead)
 async def unpurchase_item(item_id: int, user: AdminUser, db: DBSession):
     item = await service.unpurchase_item(db, item_id)

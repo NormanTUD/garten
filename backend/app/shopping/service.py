@@ -1,6 +1,6 @@
 from datetime import datetime, date
 
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -15,8 +15,11 @@ async def get_items(db: AsyncSession, include_purchased: bool = False):
         joinedload(ShoppingItem.purchased_by),
     )
     if not include_purchased:
-        q = q.where(ShoppingItem.purchased == False)
-    q = q.order_by(desc(ShoppingItem.created_at))
+        # Zeige: alle offenen + alle recurring (auch wenn gekauft)
+        q = q.where(
+            (ShoppingItem.purchased == False) | (ShoppingItem.is_recurring == True)
+        )
+    q = q.order_by(ShoppingItem.is_recurring.desc(), desc(ShoppingItem.created_at))
     result = await db.execute(q)
     return result.scalars().unique().all()
 
@@ -36,6 +39,7 @@ async def create_item(db: AsyncSession, user_id: int, data: ShoppingItemCreate):
         notes=data.notes,
         quantity=data.quantity,
         category=data.category,
+        is_recurring=data.is_recurring,
         added_by_id=user_id,
     )
     db.add(item)
@@ -55,6 +59,8 @@ async def update_item(db: AsyncSession, item_id: int, data: ShoppingItemUpdate):
         item.quantity = data.quantity
     if data.category is not None:
         item.category = data.category
+    if data.is_recurring is not None:
+        item.is_recurring = data.is_recurring
     await db.flush()
     return item
 
@@ -80,7 +86,7 @@ async def purchase_item(
     db.add(expense)
     await db.flush()
 
-    # 2. Gutschrift für den Käufer (wird ihm angerechnet)
+    # 2. Gutschrift für den Käufer
     payment = MemberPayment(
         user_id=user_id,
         for_user_id=user_id,
@@ -89,7 +95,7 @@ async def purchase_item(
         description=f"Einkauf: {item.title}" + (f" ({item.quantity})" if item.quantity else ""),
         payment_date=date.today(),
         confirmed_by_admin=False,
-        notes=f"Automatisch aus Einkaufsliste",
+        notes="Automatisch aus Einkaufsliste",
     )
     db.add(payment)
     await db.flush()
@@ -104,6 +110,23 @@ async def purchase_item(
     await db.flush()
     return item
 
+
+async def reset_recurring_item(db: AsyncSession, item_id: int):
+    """Reset a recurring item so it can be purchased again."""
+    item = await get_item(db, item_id)
+    if not item or not item.is_recurring or not item.purchased:
+        return None
+
+    item.purchased = False
+    item.purchased_by_id = None
+    item.purchased_at = None
+    item.cost_cents = None
+    item.expense_id = None
+
+    await db.flush()
+    return item
+
+
 async def unpurchase_item(db: AsyncSession, item_id: int):
     item = await get_item(db, item_id)
     if not item or not item.purchased:
@@ -116,7 +139,6 @@ async def unpurchase_item(db: AsyncSession, item_id: int):
             await db.delete(expense)
 
     # Gutschrift (MemberPayment) löschen
-    from sqlalchemy import select, and_
     q = select(MemberPayment).where(
         and_(
             MemberPayment.user_id == item.purchased_by_id,
@@ -139,19 +161,18 @@ async def unpurchase_item(db: AsyncSession, item_id: int):
     await db.flush()
     return item
 
+
 async def delete_item(db: AsyncSession, item_id: int):
     item = await get_item(db, item_id)
     if not item:
         return False
 
-    # Falls gekauft, Ausgabe + Gutschrift löschen
     if item.purchased:
         if item.expense_id:
             expense = await db.get(GardenExpense, item.expense_id)
             if expense:
                 await db.delete(expense)
 
-        from sqlalchemy import select, and_
         q = select(MemberPayment).where(
             and_(
                 MemberPayment.user_id == item.purchased_by_id,
@@ -168,3 +189,4 @@ async def delete_item(db: AsyncSession, item_id: int):
     await db.delete(item)
     await db.flush()
     return True
+

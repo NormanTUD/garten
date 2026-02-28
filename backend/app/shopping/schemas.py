@@ -7,6 +7,7 @@ class ShoppingItemCreate(BaseModel):
     notes: str | None = None
     quantity: str | None = None
     category: str | None = None
+    is_recurring: bool = False  # NEU
 
 
 class ShoppingItemUpdate(BaseModel):
@@ -14,11 +15,12 @@ class ShoppingItemUpdate(BaseModel):
     notes: str | None = None
     quantity: str | None = None
     category: str | None = None
+    is_recurring: bool | None = None  # NEU
 
 
 class ShoppingItemPurchase(BaseModel):
     cost_cents: int = Field(gt=0)
-    notes: str | None = None  # Optionale Notiz für die Finanzbuchung
+    notes: str | None = None
 
 
 class ShoppingItemRead(BaseModel):
@@ -27,6 +29,7 @@ class ShoppingItemRead(BaseModel):
     notes: str | None
     quantity: str | None
     category: str | None
+    is_recurring: bool  # NEU
     added_by_name: str
     added_by_id: int
     created_at: datetime
@@ -46,6 +49,7 @@ class ShoppingItemRead(BaseModel):
             notes=obj.notes,
             quantity=obj.quantity,
             category=obj.category,
+            is_recurring=obj.is_recurring,
             added_by_name=obj.added_by.display_name,
             added_by_id=obj.added_by_id,
             created_at=obj.created_at,
