@@ -80,7 +80,7 @@ def setup_routers(app: FastAPI) -> None:
     from app.watering.router import fertilizing_router, watering_router
     from app.duty.router import router as duty_router
 
-    app.include_router(duty_router, prefix="/api")
+    app.include_router(duty_router)
     app.include_router(auth_router)
     app.include_router(user_router)
     app.include_router(audit_router)

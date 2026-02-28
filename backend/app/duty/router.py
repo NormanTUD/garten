@@ -14,8 +14,7 @@ from app.duty.schemas import (
     DutyOverview,
 )
 
-router = APIRouter(prefix="/duty", tags=["duty"])
-
+router = APIRouter(prefix="/api/duty", tags=["duty"])
 
 # ─── Config (Admin only) ──────────────────────────────────
 
