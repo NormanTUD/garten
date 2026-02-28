@@ -8,10 +8,12 @@ const rail = ref(false);
 const { mdAndUp } = useDisplay();
 
 const navItems = [
+/*
   { title: "Dashboard", icon: "mdi-view-dashboard", to: "/" },
   { title: "Garten & Beete", icon: "mdi-flower", to: "/garden" },
   { title: "Ernte", icon: "mdi-basket", to: "/harvest" },
   { title: "Bewässerung", icon: "mdi-water", to: "/watering" },
+  */
   { title: "Finanzen", icon: "mdi-cash-register", to: "/finance" },
   { title: "Nachrichten", icon: "mdi-email", to: "/messages" },
 ];
