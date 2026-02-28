@@ -52,7 +52,7 @@ class GardenDutyLog(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     date = Column(Date, nullable=False)
     hours = Column(Float, nullable=False)  # Supports 0.5h increments
-    description = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
     confirmed = Column(Boolean, default=False, nullable=False)
     confirmed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 

@@ -68,7 +68,7 @@ class DutyAssignmentRead(BaseModel):
 class DutyLogCreate(BaseModel):
     date: date
     hours: float = Field(gt=0)
-    description: str = Field(min_length=1)
+    description: str = ""
 
 
 class DutyLogRead(BaseModel):

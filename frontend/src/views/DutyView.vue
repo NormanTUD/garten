@@ -417,7 +417,10 @@ watch(selectedYear, fetchAll);
                 <v-chip v-if="b.pending_hours > 0" size="x-small" color="warning" variant="flat" class="ml-2">
                   +{{ b.pending_hours }}h ⏳
                 </v-chip>
-                <v-chip v-if="b.remaining_hours <= 0" size="x-small" color="success" variant="flat" class="ml-2">
+                <v-chip v-if="b.remaining_hours < 0" size="x-small" color="success" variant="flat" class="ml-2">
+                  +{{ Math.abs(b.remaining_hours) }}h extra 🎉
+                </v-chip>
+                <v-chip v-else-if="b.remaining_hours === 0" size="x-small" color="success" variant="flat" class="ml-2">
                   ✓
                 </v-chip>
                 <v-chip v-else-if="b.compensation_cents > 0" size="x-small" color="error" variant="tonal" class="ml-2">
@@ -590,9 +593,8 @@ watch(selectedYear, fetchAll);
           />
           <v-textarea
             v-model="logForm.description"
-            label="Was wurde gemacht?"
+            label="Was wurde gemacht? (optional)"
             rows="3"
-            :rules="[v => !!v || 'Beschreibung ist erforderlich']"
           />
         </v-card-text>
         <v-card-actions>
@@ -600,7 +602,7 @@ watch(selectedYear, fetchAll);
           <v-btn @click="showLogDialog = false">Abbrechen</v-btn>
           <v-btn
             color="primary"
-            :disabled="!logForm.description || logForm.hours <= 0"
+            :disabled="logForm.hours <= 0"
             @click="submitLog"
           >
             Eintragen
