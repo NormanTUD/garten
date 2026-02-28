@@ -163,15 +163,15 @@ class MemberBalance(BaseModel):
     user_id: int
     display_name: str
     total_paid_cents: int
-    total_standing_order_cents: int           # Actual (completed months)
+    total_standing_order_cents: int           # Actual (completed months only)
     total_standing_order_projected_cents: int  # Full year projection
     total_income_cents: int                   # Actual
-    total_income_projected_cents: int         # Projected
+    total_income_projected_cents: int         # Projected (full year)
     share_recurring_cents: int
     share_onetime_cents: int
     share_total_cents: int
-    remaining_cents: int                      # Based on actual
-    remaining_projected_cents: int            # Based on projected
+    remaining_cents: int                      # Actual: positive = owes, negative = overpaid
+    remaining_projected_cents: int            # Projected: positive = will owe, negative = will be refunded
 
 
 class GardenFundOverview(BaseModel):

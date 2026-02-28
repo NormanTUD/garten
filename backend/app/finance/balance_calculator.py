@@ -171,7 +171,7 @@ async def calculate_fund_overview(
     for order in standing_orders:
         skipped_months = {s.month for s in order.skips if s.year == year}
 
-        # Actual: only completed months (past)
+        # Actual: only completed months
         completed = _completed_months_list(
             order.valid_from, order.valid_to, year, today
         )
@@ -181,7 +181,7 @@ async def calculate_fund_overview(
             standing_map_actual.get(order.user_id, 0) + actual_total
         )
 
-        # Projected: full year (assuming future months will be paid)
+        # Projected: full year
         all_months = _active_months_list(order.valid_from, order.valid_to, year)
         paid_all = [m for m in all_months if m not in skipped_months]
         projected_total = order.amount_cents * len(paid_all)
@@ -205,6 +205,7 @@ async def calculate_fund_overview(
         income_actual = paid + standing_actual
         income_projected = paid + standing_projected
 
+        # positive = owes money, negative = overpaid (gets refund)
         remaining = share_total_annual - income_actual
         remaining_projected = share_total_annual - income_projected
 
