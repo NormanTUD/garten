@@ -35,10 +35,10 @@ const unitOptions = [
 ];
 
 const form = ref({
-  plant_id: null as number | null,
+  plant_id: undefined as number | undefined,
   amount: null as number | null,
   unit: "kg",
-  quality_rating: null as number | null,
+  quality_rating: undefined as number | undefined,
   harvest_date: new Date().toISOString().split("T")[0],
   notes: "",
 });
@@ -63,10 +63,10 @@ function plantLabel(plant: Plant): string {
 
 function openDialog() {
   form.value = {
-    plant_id: null,
+    plant_id: undefined,
     amount: null,
     unit: "kg",
-    quality_rating: null,
+    quality_rating: undefined,
     harvest_date: new Date().toISOString().split("T")[0],
     notes: "",
   };
