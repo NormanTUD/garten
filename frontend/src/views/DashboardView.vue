@@ -123,6 +123,7 @@ onMounted(async () => {
     </v-card>
 
     <!-- ═══ Garden Stats ═══════════════════════════════════════ -->
+    <!--
     <v-row>
       <v-col cols="6" md="3">
         <v-card color="primary" variant="tonal">
@@ -161,6 +162,7 @@ onMounted(async () => {
         </v-card>
       </v-col>
     </v-row>
+    -->
 
     <!-- ═══ All Members Overview ═══════════════════════════════ -->
     <v-card v-if="fund" class="mt-6">
