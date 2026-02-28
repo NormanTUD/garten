@@ -1,6 +1,6 @@
 """garden duty system
 
-Revision ID: 007
+Revision ID: 006
 Revises: 005
 Create Date: 2026-02-28
 """
