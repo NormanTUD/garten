@@ -68,8 +68,10 @@ async function handleLogout() {
     />
 
     <v-app-bar-title>
-      <v-icon icon="mdi-sprout" />
-      <span class="d-none d-sm-inline ml-2">GartenApp</span>
+      <router-link to="/" class="d-flex align-center text-decoration-none" style="color: inherit;">
+        <v-icon icon="mdi-sprout" />
+        <span class="d-none d-sm-inline ml-2">GartenApp</span>
+      </router-link>
     </v-app-bar-title>
 
     <v-spacer />
