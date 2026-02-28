@@ -658,7 +658,7 @@ function projectedBalanceColor(remaining: number): string {
 
         <!-- Kostenaufstellung -->
         <v-divider />
-        <v-expansion-panels variant="accordion" flat>
+	<v-expansion-panels v-if="fund" variant="accordion" flat>
           <v-expansion-panel>
             <v-expansion-panel-title>
               <v-icon icon="mdi-calculator" size="small" class="mr-2" />
@@ -831,7 +831,7 @@ function projectedBalanceColor(remaining: number): string {
 
         <!-- All members -->
         <v-divider />
-        <v-card-text class="pt-2 pb-3">
+	<v-card-text v-if="fund" class="pt-2 pb-3">
           <div class="text-caption text-medium-emphasis mb-2">
             Alle Mitglieder ({{ fund.member_count }}) – Stand: abgeschlossene Monate
           </div>
