@@ -280,7 +280,7 @@ function balanceText(remaining: number): string {
 }
 
 function paymentTypeLabel(t: string): string {
-  return { cash: "💵 Bar", transfer: "🏦 Überweisung", material: "🛒 Sachleistung" }[t] || t;
+  return { cash: "💵 Bar", transfer: "🏦 Überweisung", material: "🛒 Sachleistung", payout: "💸 Auszahlung" }[t] || t;
 }
 
 function intervalLabel(i: string): string {
@@ -351,6 +351,15 @@ async function deleteExpense(id: number) {
 function openPaymentDialog() {
   paymentForm.value = {
     amount: null, payment_type: "cash", for_user_id: null,
+    description: "", payment_date: new Date().toISOString().split("T")[0],
+    receipt_image_path: null,
+  };
+  showPaymentDialog.value = true;
+}
+
+function openPayoutDialog() {
+  paymentForm.value = {
+    amount: null, payment_type: "payout", for_user_id: null,
     description: "", payment_date: new Date().toISOString().split("T")[0],
     receipt_image_path: null,
   };
@@ -839,6 +848,7 @@ function projectedBalanceColor(remaining: number): string {
       <div class="d-flex ga-2 mb-4 flex-wrap">
         <v-btn color="primary" size="large" prepend-icon="mdi-plus" @click="openExpenseDialog">Ausgabe</v-btn>
         <v-btn color="success" size="large" variant="tonal" prepend-icon="mdi-cash-plus" @click="openPaymentDialog">Einzahlung</v-btn>
+        <v-btn v-if="auth.isAdmin" color="error" variant="tonal" prepend-icon="mdi-cash-minus" @click="openPayoutDialog">Auszahlung</v-btn>
         <v-btn color="info" variant="tonal" prepend-icon="mdi-bank-transfer" @click="openStandingDialog">Dauerauftrag</v-btn>
         <v-btn v-if="auth.isAdmin" color="default" variant="outlined" size="small" prepend-icon="mdi-repeat" @click="openRecurringDialog">Laufende Kosten</v-btn>
       </div>
@@ -919,7 +929,9 @@ function projectedBalanceColor(remaining: number): string {
                 <v-avatar v-if="p.receipt_image_path" rounded="lg" size="48">
                   <v-img :src="`/api/finance/receipts/${p.receipt_image_path.replace('receipts/', '')}`" cover />
                 </v-avatar>
-                <v-avatar v-else color="success" variant="tonal" size="48"><v-icon icon="mdi-cash-plus" /></v-avatar>
+                <v-avatar v-else :color="p.payment_type === 'payout' ? 'error' : 'success'" variant="tonal" size="48">
+                  <v-icon :icon="p.payment_type === 'payout' ? 'mdi-cash-minus' : 'mdi-cash-plus'" />
+                </v-avatar>
               </template>
               <template #title>
                 <span class="font-weight-bold">{{ p.for_user ? p.for_user.display_name : p.user.display_name }}</span>
@@ -935,7 +947,9 @@ function projectedBalanceColor(remaining: number): string {
               </template>
               <template #append>
                 <div class="text-right">
-                  <div class="text-body-1 font-weight-bold text-success">{{ eur(p.amount_cents) }}</div>
+                  <div class="text-body-1 font-weight-bold" :class="p.payment_type === 'payout' ? 'text-error' : 'text-success'">
+                    {{ p.payment_type === 'payout' ? '- ' : '' }}{{ eur(p.amount_cents) }}
+                  </div>
                   <div class="d-flex ga-1 justify-end mt-1">
                     <v-btn v-if="auth.isAdmin && !p.confirmed_by_admin" size="x-small" color="success" variant="tonal" @click="confirmPayment(p.id)">Bestätigen</v-btn>
                     <v-btn v-if="auth.isAdmin" size="x-small" icon="mdi-delete" variant="text" color="error" @click="deletePayment(p.id)" />
@@ -1077,7 +1091,10 @@ function projectedBalanceColor(remaining: number): string {
     <!-- ═══ Payment Dialog ═════════════════════════════════════ -->
     <v-dialog v-model="showPaymentDialog" max-width="500" eager>
       <v-card>
-        <v-card-title><v-icon icon="mdi-cash-plus" class="mr-2" color="success" />Einzahlung in die Gartenkasse</v-card-title>
+        <v-card-title>
+          <v-icon :icon="paymentForm.payment_type === 'payout' ? 'mdi-cash-minus' : 'mdi-cash-plus'" class="mr-2" :color="paymentForm.payment_type === 'payout' ? 'error' : 'success'" />
+          {{ paymentForm.payment_type === 'payout' ? 'Auszahlung aus der Gartenkasse' : 'Einzahlung in die Gartenkasse' }}
+        </v-card-title>
         <v-card-text>
           <v-form @submit.prevent="savePayment">
             <v-text-field v-model.number="paymentForm.amount" label="Betrag (€) *" type="number" min="0.01" step="0.01" prefix="€" autofocus inputmode="decimal" variant="outlined" density="comfortable" class="mb-3 text-h5" />
@@ -1086,6 +1103,7 @@ function projectedBalanceColor(remaining: number): string {
               <v-btn value="cash">💵 Bar</v-btn>
               <v-btn value="transfer">🏦 Überweisung</v-btn>
               <v-btn value="material">🛒 Sachleistung</v-btn>
+	      <v-btn value="payout" color="error">💸 Auszahlung</v-btn>
             </v-btn-toggle>
             <v-text-field v-model="paymentForm.payment_date" label="Datum" type="date" variant="outlined" density="comfortable" class="mb-3" />
             <v-text-field v-model="paymentForm.description" label="Beschreibung" :placeholder="paymentForm.payment_type === 'material' ? 'z.B. Erde mitgebracht' : 'optional'" variant="outlined" density="comfortable" class="mb-3" />
@@ -1093,7 +1111,13 @@ function projectedBalanceColor(remaining: number): string {
               <div class="text-body-2 text-medium-emphasis mb-1">Beleg / Rechnung:</div>
               <PhotoCapture v-model="paymentForm.receipt_image_path" label="Beleg fotografieren" />
             </template>
-            <v-alert v-if="myBalance && myBalance.remaining_cents > 0" type="info" variant="tonal" density="compact" class="mt-3">
+            <v-alert v-if="paymentForm.payment_type === 'payout'" type="warning" variant="tonal" density="compact" class="mt-3">
+              <strong>Auszahlung:</strong> Dieser Betrag wird vom Guthaben des Mitglieds abgezogen.
+              <span v-if="paymentForm.for_user_id">
+                Nur möglich wenn Guthaben vorhanden ist.
+              </span>
+            </v-alert>
+            <v-alert v-else-if="myBalance && myBalance.remaining_cents > 0" type="info" variant="tonal" density="compact" class="mt-3">
               Du schuldest noch {{ eur(myBalance.remaining_cents) }} für {{ selectedYear }}.
             </v-alert>
           </v-form>
@@ -1101,7 +1125,9 @@ function projectedBalanceColor(remaining: number): string {
         <v-card-actions>
           <v-spacer />
           <v-btn variant="text" @click="showPaymentDialog = false">Abbrechen</v-btn>
-          <v-btn color="success" size="large" :disabled="!paymentForm.amount" @click="savePayment"><v-icon start icon="mdi-check" />Einzahlen</v-btn>
+          <v-btn :color="paymentForm.payment_type === 'payout' ? 'error' : 'success'" size="large" :disabled="!paymentForm.amount" @click="savePayment">
+            <v-icon start icon="mdi-check" />{{ paymentForm.payment_type === 'payout' ? 'Auszahlen' : 'Einzahlen' }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

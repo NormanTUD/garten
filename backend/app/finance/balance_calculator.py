@@ -144,14 +144,20 @@ async def calculate_fund_overview(
     payments_result = await db.execute(
         select(
             MemberPayment.for_user_id,
+            MemberPayment.payment_type,
             func.coalesce(func.sum(MemberPayment.amount_cents), 0),
         )
         .where(MemberPayment.payment_date >= year_start)
         .where(MemberPayment.payment_date <= year_end)
         .where(MemberPayment.for_user_id.is_not(None))
-        .group_by(MemberPayment.for_user_id)
+        .group_by(MemberPayment.for_user_id, MemberPayment.payment_type)
     )
-    payments_map = dict(payments_result.all())
+    payments_map: dict[int, int] = {}
+    for user_id, ptype, total in payments_result.all():
+        if ptype == "payout":
+            payments_map[user_id] = payments_map.get(user_id, 0) - total
+        else:
+            payments_map[user_id] = payments_map.get(user_id, 0) + total
     total_payments = sum(payments_map.values())
 
     # ─── Standing orders this year ─────────────────────────────

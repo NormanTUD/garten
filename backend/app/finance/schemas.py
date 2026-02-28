@@ -123,7 +123,7 @@ class GardenExpenseRead(BaseModel):
 
 class MemberPaymentCreate(BaseModel):
     amount_cents: int = Field(..., gt=0)
-    payment_type: str = Field(..., pattern=r"^(cash|transfer|material)$")
+    payment_type: str = Field(..., pattern=r"^(cash|transfer|material|payout)$")
     for_user_id: int | None = None  # NEU: Admin kann für anderen eintragen
     description: str | None = Field(default=None, max_length=500)
     payment_date: date
@@ -149,7 +149,7 @@ class MemberPaymentRead(BaseModel):
 
 class MemberPaymentUpdate(BaseModel):
     amount_cents: int | None = Field(default=None, gt=0)
-    payment_type: str | None = Field(default=None, pattern=r"^(cash|transfer|material)$")
+    payment_type: str | None = Field(default=None, pattern=r"^(cash|transfer|material|payout)$")
     description: str | None = Field(default=None, max_length=500)
     payment_date: date | None = None
     receipt_image_path: str | None = None
