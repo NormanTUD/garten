@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# 1. Alles stoppen + Container entfernen
+docker compose down -v
+
+# 2. Neu bauen und starten
+docker compose up -d --build
+
+# 3. Migration ausführen
+docker compose exec backend alembic upgrade head
+
