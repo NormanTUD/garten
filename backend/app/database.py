@@ -8,28 +8,38 @@ from app.config import settings
 
 logger = logging.getLogger("gartenapp.database")
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.debug,
-    connect_args={
-        "timeout": 30,
-    },
-    pool_pre_ping=True,
-    pool_size=1,        # SQLite: nur 1 Connection
-    max_overflow=0,     # Keine zusätzlichen Connections
-)
+# ─── Engine Configuration ──────────────────────────────────────────
 
+engine_kwargs: dict = {
+    "echo": settings.debug,
+    "pool_pre_ping": True,
+}
 
-@event.listens_for(engine.sync_engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    """Enable WAL mode and busy timeout for SQLite."""
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=30000")
-    cursor.execute("PRAGMA synchronous=NORMAL")
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+if settings.is_sqlite:
+    # SQLite: single writer, WAL mode
+    engine_kwargs["connect_args"] = {"timeout": 30}
+    engine_kwargs["pool_size"] = 1
+    engine_kwargs["max_overflow"] = 0
+else:
+    # PostgreSQL: concurrent connections
+    engine_kwargs["pool_size"] = 10
+    engine_kwargs["max_overflow"] = 20
 
+engine = create_async_engine(settings.database_url, **engine_kwargs)
+
+# ─── SQLite Pragmas ────────────────────────────────────────────────
+
+if settings.is_sqlite:
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+# ─── Session Factory ──────────────────────────────────────────────
 
 async_session_factory = async_sessionmaker(
     engine,
@@ -38,13 +48,15 @@ async_session_factory = async_sessionmaker(
 )
 
 
+# ─── Base ──────────────────────────────────────────────────────────
+
 class Base(DeclarativeBase):
     pass
 
 
+# ─── Table Creation (debug / tests) ───────────────────────────────
+
 async def create_all_tables() -> None:
-    # Import all models so Base.metadata knows about them
-    # Use module imports to avoid needing exact class names
     from app.audit import models as _audit  # noqa: F401
     from app.auth import models as _auth  # noqa: F401
     from app.beds import models as _beds  # noqa: F401
@@ -59,6 +71,8 @@ async def create_all_tables() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
+# ─── Dependency ────────────────────────────────────────────────────
+
 async def get_db():
     async with async_session_factory() as session:
         try:
@@ -71,4 +85,3 @@ async def get_db():
 
 # Backward-compatible alias
 get_async_session = get_db
-

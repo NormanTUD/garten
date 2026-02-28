@@ -32,11 +32,17 @@ class Settings(BaseSettings):
     upload_dir: Path = Path("uploads")
 
     @property
+    def is_sqlite(self) -> bool:
+        return "sqlite" in self.database_url
+
+    @property
     def async_database_url(self) -> str:
         """Ensure the URL uses an async driver."""
         url = self.database_url
         if url.startswith("sqlite://"):
             url = url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
 
 
