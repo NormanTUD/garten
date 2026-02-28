@@ -17,6 +17,7 @@ const navItems = [
   { title: "Finanzen", icon: "mdi-cash-register", to: "/finance" },
   { title: "Gartenstunden", icon: "mdi-shovel", to: "/duty" },  // NEU
   { title: "Nachrichten", icon: "mdi-email", to: "/messages" },
+  { title: "Einkaufsliste", icon: "mdi-cart", to: "/shopping" },
 ];
 
 const adminItems = [
