@@ -68,11 +68,13 @@ async def purchase_item(
 
     # 1. Finanzbuchung erstellen (Einmal-Ausgabe)
     expense = GardenExpense(
+        user_id=user_id,
         description=f"Einkauf: {item.title}" + (f" ({item.quantity})" if item.quantity else ""),
         amount_cents=data.cost_cents,
         category_id=None,
-        date=date.today(),
-        is_recurring=False,
+        expense_date=date.today(),
+        is_shared=True,
+        confirmed_by_admin=False,
         notes=data.notes or f"Aus Einkaufsliste von {item.added_by.display_name}",
     )
     db.add(expense)
