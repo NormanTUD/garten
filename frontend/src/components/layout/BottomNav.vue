@@ -11,10 +11,12 @@ const auth = useAuthStore();
       <span>Home</span>
     </v-btn>
 
+    <!--
     <v-btn to="/garden" value="garden">
       <v-icon>mdi-flower</v-icon>
       <span>Garten</span>
     </v-btn>
+    -->
 
     <v-btn to="/finance" value="finance">
       <v-icon>mdi-cash-register</v-icon>
