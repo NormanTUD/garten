@@ -520,6 +520,11 @@ async function confirmExpense(id: number) {
   await api.patch(`/finance/expenses/${id}/confirm`);
   await loadAll();
 }
+
+async function unconfirmExpense(id: number) {
+  await api.patch(`/finance/expenses/${id}/unconfirm`);
+  await loadAll();
+}
 </script>
 
 <template>
@@ -693,18 +698,9 @@ async function confirmExpense(id: number) {
 
                     </td>
                     <td>{{ e.user.display_name }}</td>
-                    <td class="text-right font-weight-bold">{{ eur(e.amount_cents) }}
-			  <v-btn
-			    v-if="auth.isAdmin && e.is_shared && !e.confirmed_by_admin"
-			    size="x-small"
-			    color="success"
-			    variant="tonal"
-			    class="mr-1"
-			    @click.stop="confirmExpense(e.id)"
-			  >
-			    ✓ Bestätigen
-			  </v-btn>
-
+                    <td class="text-right font-weight-bold">
+                      {{ eur(e.amount_cents) }}
+                      <v-btn v-if="auth.isAdmin" size="x-small" color="warning" variant="tonal" density="compact" class="ml-1" @click="unconfirmExpense(e.id)">↩</v-btn>
                       <v-btn v-if="auth.isAdmin" size="x-small" icon="mdi-delete" variant="text" color="error" density="compact" class="ml-1" @click="deleteExpense(e.id)" />
                     </td>
                   </tr>
@@ -833,11 +829,19 @@ async function confirmExpense(id: number) {
                     >
                       ✓ Bestätigen
                     </v-btn>
+                    <v-btn
+                      v-if="auth.isAdmin && e.is_shared && e.confirmed_by_admin"
+                      size="x-small"
+                      color="warning"
+                      variant="tonal"
+                      @click.stop="unconfirmExpense(e.id)"
+                    >
+                      ↩ Widerrufen
+                    </v-btn>
                     <v-btn v-if="auth.isAdmin" size="x-small" icon="mdi-delete" variant="text" color="error" @click="deleteExpense(e.id)" />
                   </div>
                 </div>
               </template>
-
             </v-list-item>
           </v-list>
         </v-window-item>

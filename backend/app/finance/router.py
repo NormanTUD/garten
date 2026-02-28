@@ -210,6 +210,26 @@ async def confirm_expense(expense_id: int, admin: AdminUser, db: DBSession):
     await db.refresh(expense)
     return expense
 
+@expense_router.patch("/{expense_id}/unconfirm", response_model=GardenExpenseRead)
+async def unconfirm_expense(expense_id: int, admin: AdminUser, db: DBSession):
+    """Admin revokes confirmation of a shared expense."""
+    from sqlalchemy import select
+    from app.finance.models import GardenExpense
+
+    result = await db.execute(select(GardenExpense).where(GardenExpense.id == expense_id))
+    expense = result.scalar_one_or_none()
+    if expense is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
+
+    if not expense.confirmed_by_admin:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Not confirmed")
+
+    expense.confirmed_by_admin = False
+    expense.confirmed_by_id = None
+    await db.flush()
+    await db.refresh(expense)
+    return expense
+
 @expense_router.get("/{expense_id}", response_model=GardenExpenseRead)
 async def get_expense(expense_id: int, user: CurrentUser, db: DBSession):
     expense = await service.get_expense_by_id(db, expense_id)
