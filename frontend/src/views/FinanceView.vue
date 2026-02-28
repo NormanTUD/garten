@@ -631,6 +631,7 @@ function projectedBalanceColor(remaining: number): string {
             </v-col>
           </v-row>
         </v-card-text>
+      </v-card>
 
         <!-- Kostenaufstellung -->
         <v-divider />
