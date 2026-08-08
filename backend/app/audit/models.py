@@ -25,4 +25,6 @@ class AuditLog(Base):
         server_default=func.now(),
         index=True,
     )
-
+    # Optional hash-chain columns (enabled via settings.audit_hash_chain)
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    entry_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)

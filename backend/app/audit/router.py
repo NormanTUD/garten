@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse, PlainTextResponse
 
+from app.audit import chain as audit_chain
 from app.audit.schemas import AuditLogQuery, AuditLogRead
 from app.audit.service import get_audit_log_count, query_audit_logs
 from app.dependencies import AdminUser, DBSession
@@ -37,4 +39,26 @@ async def count_audit_logs(admin: AdminUser, db: DBSession):
     """Get total audit log count. Admin only."""
     count = await get_audit_log_count(db)
     return {"count": count}
+
+
+@router.get("/chain/verify")
+async def verify_audit_chain(admin: AdminUser, db: DBSession):
+    """Verify the SHA-256 hash chain of the audit log.
+
+    Returns ``{"valid": bool, "breaks": [...]}``. A non-empty ``breaks``
+    list indicates that someone (or a bug) modified historical audit rows.
+    """
+    is_valid, breaks = await audit_chain.verify_chain(db)
+    return JSONResponse(content={"valid": is_valid, "breaks": breaks})
+
+
+@router.get("/export.csv", response_class=PlainTextResponse)
+async def export_audit_csv(admin: AdminUser, db: DBSession):
+    """Export the full audit log as CSV. Useful for off-site backups."""
+    csv_text = await audit_chain.export_csv(db)
+    return PlainTextResponse(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=audit_log.csv"},
+    )
 

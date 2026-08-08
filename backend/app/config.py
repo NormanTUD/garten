@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # File storage
     upload_dir: Path = Path("uploads")
 
+    # Audit log
+    audit_hash_chain: bool = True
+
     def model_post_init(self, __context) -> None:
         """Warn about insecure default secret_key in production."""
         if "change-me" in self.secret_key.lower() or len(self.secret_key) < 32:

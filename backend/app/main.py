@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,9 +12,13 @@ from app.middleware.audit_log import AuditLogMiddleware
 
 logger = logging.getLogger("gartenapp")
 
+_scheduler_task: asyncio.Task[None] | None = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _scheduler_task
+
     logger.info("Starting %s v%s", settings.app_name, settings.app_version)
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
     Path("data").mkdir(parents=True, exist_ok=True)
@@ -30,7 +35,19 @@ async def lifespan(app: FastAPI):
         await seed_default_rules(session)
         await session.commit()
 
+    # Start the valve scheduler as a background task.
+    from app.valves.scheduler import run_scheduler
+
+    _scheduler_task = asyncio.create_task(run_scheduler(), name="valve-scheduler")
+
     yield
+
+    if _scheduler_task is not None:
+        _scheduler_task.cancel()
+        import contextlib
+
+        with contextlib.suppress(asyncio.CancelledError):
+            await _scheduler_task
     logger.info("Shutting down %s", settings.app_name)
 
 
@@ -106,8 +123,13 @@ def setup_routers(app: FastAPI) -> None:
     from app.audit.router import router as audit_router
     from app.auth.router import router as auth_router
     from app.auth.router import user_router
+    from app.backup.router import router as backup_router
     from app.beds.router import planting_router
     from app.beds.router import router as beds_router
+    from app.cameras.router import ingest_router as camera_ingest_router
+    from app.cameras.router import router as cameras_router
+    from app.devices.router import device_router as devices_device_router
+    from app.devices.router import router as devices_router
     from app.duty.router import router as duty_router
     from app.finance.router import (
         category_router,
@@ -121,8 +143,12 @@ def setup_routers(app: FastAPI) -> None:
     from app.garden.router import router as garden_router
     from app.harvest.router import router as harvest_router
     from app.messaging.router import message_router, rule_router
+    from app.network.router import router as network_router
     from app.plants.router import router as plants_router
     from app.shopping.router import router as shopping_router
+    from app.timeline.router import router as timeline_router
+    from app.valves.router import device_router as valves_device_router
+    from app.valves.router import router as valves_router
     from app.watering.router import fertilizing_router, watering_router
 
     app.include_router(shopping_router)
@@ -146,6 +172,16 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(standing_router)
     app.include_router(message_router)
     app.include_router(rule_router)
+    app.include_router(backup_router)
+    # New IoT / automation endpoints
+    app.include_router(devices_router)
+    app.include_router(devices_device_router)
+    app.include_router(cameras_router)
+    app.include_router(camera_ingest_router)
+    app.include_router(network_router)
+    app.include_router(valves_router)
+    app.include_router(valves_device_router)
+    app.include_router(timeline_router)
 
     @app.get("/api/health", tags=["system"])
     async def health_check():

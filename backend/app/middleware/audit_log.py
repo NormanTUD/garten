@@ -79,11 +79,16 @@ async def _write_audit_log(
     user_agent: str | None,
     duration_ms: int | None,
 ) -> None:
-    """Write audit log entry using the provided session factory."""
-    from app.audit.models import AuditLog
+    """Write audit log entry using the provided session factory.
+
+    Routes through ``audit.chain.append_with_chain`` so that the optional
+    SHA-256 hash chain is maintained when enabled.
+    """
+    from app.audit import chain as audit_chain
 
     async with session_factory() as session:
-        log = AuditLog(
+        await audit_chain.append_with_chain(
+            session,
             user_id=user_id,
             username=username,
             method=method,
@@ -94,8 +99,6 @@ async def _write_audit_log(
             user_agent=user_agent,
             duration_ms=duration_ms,
         )
-        session.add(log)
-        await session.commit()
 
 
 class AuditLogMiddleware(BaseHTTPMiddleware):
