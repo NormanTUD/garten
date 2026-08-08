@@ -153,6 +153,75 @@ async def delete_image(image_id: int, admin: AdminUser, db: DBSession):
     await db.commit()
 
 
+# ─── User-side image upload (scoped) ────────────────────────────────
+
+
+@router.post(
+    "/{camera_id}/images",
+    response_model=ImageIngestResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def user_upload_image(
+    request: Request,
+    camera_id: int,
+    db: DBSession,
+    principal: Annotated[
+        Principal, Depends(require_scope(Scope.CAMERAS_UPLOAD.value))
+    ],
+    mime_type: str = Query(default="image/jpeg", max_length=50),
+    width: int | None = Query(default=None, ge=1, le=20000),
+    height: int | None = Query(default=None, ge=1, le=20000),
+    trigger: str = Query(default="manual", max_length=30),
+    motion_score: float | None = Query(default=None, ge=0, le=1),
+    weather_temp_c: float | None = Query(default=None),
+    weather_desc: str | None = Query(default=None, max_length=100),
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    notes: str | None = Query(default=None),
+    captured_at: datetime | None = Query(default=None),
+):
+    """User-side / service-side image upload. Requires the ``cameras:upload`` scope.
+
+    Same semantics as the device-side endpoint, but uses user-API-key
+    (or JWT) authentication. Useful for trusted services that want to
+    push images without holding a per-device key.
+    """
+    camera = await service.get_camera(db, camera_id)
+    if camera is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Camera not found")
+
+    metadata = ImageMetadata(
+        width=width,
+        height=height,
+        mime_type=mime_type,
+        trigger=trigger,
+        motion_score=motion_score,
+        weather_temp_c=weather_temp_c,
+        weather_desc=weather_desc,
+        latitude=latitude,
+        longitude=longitude,
+        notes=notes,
+        captured_at=captured_at,
+    )
+
+    body = await request.body()
+    try:
+        image, alerts = await service.ingest_image(db, camera, body, metadata)
+    except ValueError as err:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(err)) from err
+
+    await db.commit()
+    logger.info(
+        "Image uploaded via user key: camera=%s principal=%s",
+        camera_id, principal.username,
+    )
+    return ImageIngestResponse(
+        image=CapturedImageRead.model_validate(image),
+        alerts_created=[a.id for a in alerts],
+        faces_detected=0,
+    )
+
+
 # ─── Known persons (admin) ──────────────────────────────────────────
 
 

@@ -5,8 +5,12 @@ Used by cameras and other IoT devices to gate alerts: only events from
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query, status
+from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from app.auth.apikeys.security import Principal, require_scope
+from app.auth.permissions import Scope
 from app.dependencies import AdminUser, CurrentUser, DBSession
 from app.network import service
 from app.network.schemas import (
@@ -79,10 +83,16 @@ async def delete_device(device_id: int, admin: AdminUser, db: DBSession):
 @router.get("/lookup", response_model=MacLookupResponse)
 async def lookup_mac(
     mac: str = Query(..., min_length=11, max_length=17),
-    user: CurrentUser = None,
+    principal: Annotated[
+        Principal,
+        Depends(require_scope(Scope.NETWORK_READ.value)),
+    ] = None,
     db: DBSession = None,
 ):
     """Quick allowlist check (used by camera/IoT devices & the frontend).
+
+    Requires the ``network:read`` scope. Admins and regular users with
+    the default scope set pass automatically; API keys must include it.
 
     ``is_trusted`` in the response reflects the *effective* trust value:
     a device that exists but is inactive (or explicitly untrusted) returns
