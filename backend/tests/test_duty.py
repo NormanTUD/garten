@@ -1,7 +1,7 @@
-import pytest
 from datetime import date
-from httpx import AsyncClient
 
+import pytest
+from httpx import AsyncClient
 
 # ─── Fixtures ──────────────────────────────────────────────
 
@@ -277,7 +277,7 @@ class TestDutyLogs:
         year = date.today().year
         resp = await user_client.get(f"/api/duty/logs/{year}")
         assert resp.status_code == 200
-        ids = [l["id"] for l in resp.json()]
+        ids = [entry["id"] for entry in resp.json()]
         assert duty_log["id"] in ids
 
     async def test_list_logs_filter_by_user(

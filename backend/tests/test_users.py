@@ -2,7 +2,6 @@ from httpx import AsyncClient
 
 from tests.conftest import auth_header
 
-
 # ─── List Users (Admin only) ─────────────────────────────────────
 
 async def test_list_users_as_admin(client: AsyncClient, admin_user):
@@ -248,6 +247,69 @@ async def test_admin_reset_user_password(client: AsyncClient, admin_user, normal
     login_resp = await client.post("/api/auth/login", json={
         "username": "testuser",
         "password": "resetted123",
+    })
+    assert login_resp.status_code == 200
+
+
+async def test_admin_can_update_user_password_via_patch(
+    client: AsyncClient, admin_user, normal_user
+):
+    """Regression: PATCH /api/users/{id} with password must hash & persist it.
+
+    Previously this raised ModuleNotFoundError because the router tried to
+    import a non-existent ``app.auth.security`` module.
+    """
+    user, _ = normal_user
+    _, admin_token = admin_user
+
+    response = await client.patch(
+        f"/api/users/{user.id}",
+        headers=auth_header(admin_token),
+        json={"password": "patchedpw1"},
+    )
+    assert response.status_code == 200
+
+    # New password must work for login
+    login_resp = await client.post("/api/auth/login", json={
+        "username": "testuser",
+        "password": "patchedpw1",
+    })
+    assert login_resp.status_code == 200
+
+
+async def test_admin_patch_user_password_too_short_rejected(
+    client: AsyncClient, admin_user, normal_user
+):
+    user, _ = normal_user
+    _, admin_token = admin_user
+
+    response = await client.patch(
+        f"/api/users/{user.id}",
+        headers=auth_header(admin_token),
+        json={"password": "abc"},
+    )
+    assert response.status_code == 422
+
+
+async def test_admin_patch_user_without_password_keeps_old_one(
+    client: AsyncClient, admin_user, normal_user
+):
+    """PATCH without password field should not touch the stored hash."""
+    user, _ = normal_user
+    _, admin_token = admin_user
+
+    # Patch only display_name
+    response = await client.patch(
+        f"/api/users/{user.id}",
+        headers=auth_header(admin_token),
+        json={"display_name": "Renamed"},
+    )
+    assert response.status_code == 200
+
+    # Old password still works
+    login_resp = await client.post("/api/auth/login", json={
+        "username": "testuser",
+        "password": "user1234",
     })
     assert login_resp.status_code == 200
 

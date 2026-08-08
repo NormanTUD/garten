@@ -1,12 +1,10 @@
-from datetime import datetime
 
-from sqlalchemy import select, func, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
 from app.messaging.models import AutoMessageRule, Message
 from app.messaging.schemas import AutoMessageRuleCreate, AutoMessageRuleUpdate, MessageCreate
-
 
 # ─── Messages ─────────────────────────────────────────────────────
 

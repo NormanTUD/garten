@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.beds.models import Bed, BedPlanting
 from app.beds.schemas import BedCreate, BedPlantingCreate, BedPlantingUpdate, BedUpdate
 
-
 # ─── Beds ─────────────────────────────────────────────────────────
 
 async def get_beds_by_garden(db: AsyncSession, garden_id: int) -> list[Bed]:

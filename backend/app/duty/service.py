@@ -1,20 +1,18 @@
-from datetime import date
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
-from app.duty.models import GardenDutyConfig, GardenDutyAssignment, GardenDutyLog
+from app.duty.models import GardenDutyAssignment, GardenDutyConfig, GardenDutyLog
 from app.duty.schemas import (
-    DutyConfigCreate,
-    DutyConfigUpdate,
     DutyAssignmentCreate,
     DutyAssignmentUpdate,
+    DutyConfigCreate,
+    DutyConfigUpdate,
     DutyLogCreate,
     DutyMemberBalance,
     DutyOverview,
 )
-
 
 # ─── Config ────────────────────────────────────────────────
 

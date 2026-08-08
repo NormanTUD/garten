@@ -17,6 +17,7 @@ from app.auth.utils import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
 )
 from app.dependencies import AdminUser, CurrentUser, DBSession
 
@@ -128,8 +129,7 @@ async def update_user(user_id: int, data: UserUpdate, admin: AdminUser, db: DBSe
 
     for field, value in data.model_dump(exclude_unset=True).items():
         if field == "password" and value is not None:
-            from app.auth.security import hash_password
-            setattr(user, "password_hash", hash_password(value))
+            user.password_hash = hash_password(value)
         elif field != "password":
             setattr(user, field, value)
 

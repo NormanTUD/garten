@@ -3,7 +3,14 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.finance.models import ExpenseCategory, GardenExpense, MemberPayment, RecurringCost
+from app.finance.models import (
+    ExpenseCategory,
+    GardenExpense,
+    MemberPayment,
+    RecurringCost,
+    StandingOrder,
+    StandingOrderSkip,
+)
 from app.finance.schemas import (
     ExpenseCategoryCreate,
     ExpenseCategoryUpdate,
@@ -13,10 +20,10 @@ from app.finance.schemas import (
     MemberPaymentUpdate,
     RecurringCostCreate,
     RecurringCostUpdate,
+    StandingOrderCreate,
+    StandingOrderSkipCreate,
+    StandingOrderUpdate,
 )
-
-from app.finance.models import StandingOrder, StandingOrderSkip
-from app.finance.schemas import StandingOrderCreate, StandingOrderUpdate, StandingOrderSkipCreate
 
 # ─── Categories ────────────────────────────────────────────────────
 

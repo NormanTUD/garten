@@ -1,6 +1,9 @@
+import logging
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger("gartenapp.config")
 
 
 class Settings(BaseSettings):
@@ -8,6 +11,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # Application
@@ -28,8 +32,31 @@ class Settings(BaseSettings):
     first_admin_username: str = "admin"
     first_admin_password: str = "change-me-on-first-login"
 
+    # CORS
+    cors_origins: str = "*"
+
     # File storage
     upload_dir: Path = Path("uploads")
+
+    def model_post_init(self, __context) -> None:
+        """Warn about insecure default secret_key in production."""
+        if "change-me" in self.secret_key.lower() or len(self.secret_key) < 32:
+            msg = (
+                "SECRET_KEY is set to an insecure default or is too short. "
+                "Generate a strong key with: "
+                "python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+            if self.debug:
+                logger.warning(msg)
+            else:
+                raise RuntimeError(msg)
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse comma-separated CORS origins into a list."""
+        if not self.cors_origins or self.cors_origins.strip() == "*":
+            return ["*"]
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
     def is_sqlite(self) -> bool:

@@ -60,14 +60,14 @@ async def create_all_tables() -> None:
     from app.audit import models as _audit  # noqa: F401
     from app.auth import models as _auth  # noqa: F401
     from app.beds import models as _beds  # noqa: F401
+    from app.duty import models as _duty  # noqa: F401  ← NEU
     from app.finance import models as _finance  # noqa: F401
     from app.garden import models as _garden  # noqa: F401
     from app.harvest import models as _harvest  # noqa: F401
     from app.messaging import models as _messaging  # noqa: F401
     from app.plants import models as _plants  # noqa: F401
-    from app.watering import models as _watering  # noqa: F401
-    from app.duty import models as _duty  # noqa: F401  ← NEU
     from app.shopping import models as _shopping  # noqa: F401
+    from app.watering import models as _watering  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

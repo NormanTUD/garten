@@ -1,7 +1,6 @@
 import pytest
 from httpx import AsyncClient
 
-
 # ─── Fixtures ──────────────────────────────────────────────
 
 @pytest.fixture
@@ -271,4 +270,164 @@ class TestShoppingAuth:
             "cost_cents": 899,
         })
         assert resp.status_code == 200
+
+
+# ─── Recurring Items ──────────────────────────────────────
+
+
+class TestShoppingRecurring:
+    async def test_create_recurring_item(
+        self, user_client: AsyncClient
+    ):
+        resp = await user_client.post("/api/shopping/", json={
+            "title": "Dünger (monatlich)",
+            "is_recurring": True,
+        })
+        assert resp.status_code == 201
+        assert resp.json()["is_recurring"] is True
+
+    async def test_reset_recurring_after_purchase(
+        self, user_client: AsyncClient, admin_client: AsyncClient
+    ):
+        # Create recurring item and purchase it
+        resp = await user_client.post("/api/shopping/", json={
+            "title": "Nachschub Dünger",
+            "is_recurring": True,
+        })
+        item_id = resp.json()["id"]
+
+        await user_client.post(f"/api/shopping/{item_id}/purchase", json={
+            "cost_cents": 1499,
+        })
+
+        # Reset → should be available again
+        resp = await user_client.post(f"/api/shopping/{item_id}/reset")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchased"] is False
+        assert data["cost_cents"] is None
+        assert data["expense_id"] is None
+
+    async def test_reset_non_recurring_item_404(
+        self, user_client: AsyncClient
+    ):
+        resp = await user_client.post("/api/shopping/", json={
+            "title": "Einmal-Sache",
+            "is_recurring": False,
+        })
+        item_id = resp.json()["id"]
+
+        resp = await user_client.post(f"/api/shopping/{item_id}/reset")
+        assert resp.status_code == 404
+
+    async def test_reset_not_purchased_recurring_404(
+        self, user_client: AsyncClient
+    ):
+        resp = await user_client.post("/api/shopping/", json={
+            "title": "Recurring not purchased",
+            "is_recurring": True,
+        })
+        item_id = resp.json()["id"]
+
+        resp = await user_client.post(f"/api/shopping/{item_id}/reset")
+        assert resp.status_code == 404
+
+    async def test_reset_nonexistent_item_404(self, user_client: AsyncClient):
+        resp = await user_client.post("/api/shopping/99999/reset")
+        assert resp.status_code == 404
+
+    async def test_update_item_recurring_flag(
+        self, user_client: AsyncClient, shopping_item: dict
+    ):
+        resp = await user_client.put(
+            f"/api/shopping/{shopping_item['id']}",
+            json={"is_recurring": True},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_recurring"] is True
+
+
+# ─── Admin Unpurchase ─────────────────────────────────────
+
+
+class TestShoppingAdminUnpurchase:
+    async def test_admin_can_unpurchase_purchased_item(
+        self, user_client: AsyncClient, admin_client: AsyncClient
+    ):
+        # Create + purchase as user
+        resp = await user_client.post("/api/shopping/", json={
+            "title": "Sprühmittel",
+        })
+        item_id = resp.json()["id"]
+        await user_client.post(f"/api/shopping/{item_id}/purchase", json={
+            "cost_cents": 699,
+        })
+
+        # Admin unpurchases it
+        resp = await admin_client.post(f"/api/shopping/{item_id}/unpurchase")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["purchased"] is False
+        assert data["purchased_by_name"] is None
+        assert data["expense_id"] is None
+        assert data["cost_cents"] is None
+        assert data["purchased_at"] is None
+
+    async def test_unpurchase_nonexistent_item_404(
+        self, admin_client: AsyncClient
+    ):
+        resp = await admin_client.post("/api/shopping/99999/unpurchase")
+        assert resp.status_code == 404
+
+
+# ─── Auth: Change Own Password ────────────────────────────
+
+
+class TestAuthChangePassword:
+    async def test_change_password_success(
+        self, client: AsyncClient, normal_user
+    ):
+        _, user_token = normal_user
+        resp = await client.put(
+            "/api/auth/me/password",
+            headers={"Authorization": f"Bearer {user_token}"},
+            json={
+                "current_password": "user1234",
+                "new_password": "changed99",
+            },
+        )
+        assert resp.status_code == 204
+
+        # Login with new password
+        login_resp = await client.post("/api/auth/login", json={
+            "username": "testuser",
+            "password": "changed99",
+        })
+        assert login_resp.status_code == 200
+
+    async def test_change_password_wrong_current_rejected(
+        self, client: AsyncClient, normal_user
+    ):
+        _, user_token = normal_user
+        resp = await client.put(
+            "/api/auth/me/password",
+            headers={"Authorization": f"Bearer {user_token}"},
+            json={
+                "current_password": "wrong-old",
+                "new_password": "newpw123",
+            },
+        )
+        assert resp.status_code == 400
+
+    async def test_change_password_unauthenticated_rejected(
+        self, client: AsyncClient
+    ):
+        resp = await client.put(
+            "/api/auth/me/password",
+            json={
+                "current_password": "anything",
+                "new_password": "newpw123",
+            },
+        )
+        assert resp.status_code == 401
 

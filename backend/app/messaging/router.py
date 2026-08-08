@@ -82,20 +82,18 @@ async def broadcast_message(data: MessageCreate, admin: AdminUser, db: DBSession
 
 @message_router.patch("/{message_id}", response_model=MessageRead)
 async def update_message(message_id: int, data: MessageUpdate, user: CurrentUser, db: DBSession):
-    """Mark message as read/archived."""
+    """Mark message as read/unread and/or archive/unarchive."""
     msg = await service.get_message_by_id(db, message_id)
     if msg is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
     if msg.recipient_id != user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your message")
-    if data.is_read is not None:
-        if data.is_read:
-            await service.mark_as_read(db, msg.id)
-        msg.is_read = data.is_read if data.is_read is not None else msg.is_read
-    if data.is_archived is not None:
-        if data.is_archived:
-            await service.archive_message(db, msg.id)
+    if data.is_read is not None and data.is_read != msg.is_read:
+        msg.is_read = data.is_read
+        await db.flush()
+    if data.is_archived is not None and data.is_archived != msg.is_archived:
         msg.is_archived = data.is_archived
+        await db.flush()
     await db.refresh(msg)
     return msg
 

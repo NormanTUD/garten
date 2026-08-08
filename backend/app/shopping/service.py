@@ -1,12 +1,12 @@
-from datetime import datetime, date
+from datetime import UTC, date, datetime
 
-from sqlalchemy import select, desc, and_
+from sqlalchemy import and_, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from app.shopping.models import ShoppingItem
-from app.shopping.schemas import ShoppingItemCreate, ShoppingItemUpdate, ShoppingItemPurchase
 from app.finance.models import GardenExpense, MemberPayment
+from app.shopping.models import ShoppingItem
+from app.shopping.schemas import ShoppingItemCreate, ShoppingItemPurchase, ShoppingItemUpdate
 
 
 async def get_items(db: AsyncSession, include_purchased: bool = False):
@@ -15,9 +15,9 @@ async def get_items(db: AsyncSession, include_purchased: bool = False):
         joinedload(ShoppingItem.purchased_by),
     )
     if not include_purchased:
-        # Zeige: alle offenen + alle recurring (auch wenn gekauft)
+        # Show: all open items + all recurring items (even if already purchased)
         q = q.where(
-            (ShoppingItem.purchased == False) | (ShoppingItem.is_recurring == True)
+            (~ShoppingItem.purchased) | (ShoppingItem.is_recurring.is_(True))
         )
     q = q.order_by(ShoppingItem.is_recurring.desc(), desc(ShoppingItem.created_at))
     result = await db.execute(q)
@@ -103,7 +103,7 @@ async def purchase_item(
     # 3. Item als gekauft markieren
     item.purchased = True
     item.purchased_by_id = user_id
-    item.purchased_at = datetime.utcnow()
+    item.purchased_at = datetime.now(UTC)
     item.cost_cents = data.cost_cents
     item.expense_id = expense.id
 
@@ -132,33 +132,43 @@ async def unpurchase_item(db: AsyncSession, item_id: int):
     if not item or not item.purchased:
         return None
 
-    # Finanzbuchung (Ausgabe) löschen
-    if item.expense_id:
-        expense = await db.get(GardenExpense, item.expense_id)
-        if expense:
-            await db.delete(expense)
+    expense_id = item.expense_id
+    purchased_by_id = item.purchased_by_id
+    cost_cents = item.cost_cents
+    title = item.title
 
-    # Gutschrift (MemberPayment) löschen
-    q = select(MemberPayment).where(
-        and_(
-            MemberPayment.user_id == item.purchased_by_id,
-            MemberPayment.amount_cents == item.cost_cents,
-            MemberPayment.payment_type == "expense_refund",
-            MemberPayment.description.contains(item.title),
-        )
-    )
-    result = await db.execute(q)
-    payment = result.scalar_one_or_none()
-    if payment:
-        await db.delete(payment)
-
+    # Clear FK references on the item first so we can safely delete expense/payment
     item.purchased = False
     item.purchased_by_id = None
     item.purchased_at = None
     item.cost_cents = None
     item.expense_id = None
-
     await db.flush()
+
+    # Delete the linked finance expense
+    if expense_id:
+        expense = await db.get(GardenExpense, expense_id)
+        if expense:
+            await db.delete(expense)
+            await db.flush()
+
+    # Delete the linked refund payment (best-effort match on description & amount)
+    if purchased_by_id and cost_cents is not None and title:
+        q = select(MemberPayment).where(
+            and_(
+                MemberPayment.user_id == purchased_by_id,
+                MemberPayment.amount_cents == cost_cents,
+                MemberPayment.payment_type == "expense_refund",
+                MemberPayment.description.contains(title),
+            )
+        )
+        result = await db.execute(q)
+        for payment in result.scalars().all():
+            await db.delete(payment)
+        await db.flush()
+
+    # Refresh so cached relationships (lazy="joined") reflect the cleared FK
+    await db.refresh(item)
     return item
 
 
@@ -168,25 +178,39 @@ async def delete_item(db: AsyncSession, item_id: int):
         return False
 
     if item.purchased:
-        if item.expense_id:
-            expense = await db.get(GardenExpense, item.expense_id)
+        expense_id = item.expense_id
+        purchased_by_id = item.purchased_by_id
+        cost_cents = item.cost_cents
+        title = item.title
+
+        # Clear FK on item first, then drop the item
+        item.expense_id = None
+        await db.flush()
+        await db.delete(item)
+        await db.flush()
+
+        if expense_id:
+            expense = await db.get(GardenExpense, expense_id)
             if expense:
                 await db.delete(expense)
+                await db.flush()
 
-        q = select(MemberPayment).where(
-            and_(
-                MemberPayment.user_id == item.purchased_by_id,
-                MemberPayment.amount_cents == item.cost_cents,
-                MemberPayment.payment_type == "expense_refund",
-                MemberPayment.description.contains(item.title),
+        if purchased_by_id and cost_cents is not None and title:
+            q = select(MemberPayment).where(
+                and_(
+                    MemberPayment.user_id == purchased_by_id,
+                    MemberPayment.amount_cents == cost_cents,
+                    MemberPayment.payment_type == "expense_refund",
+                    MemberPayment.description.contains(title),
+                )
             )
-        )
-        result = await db.execute(q)
-        payment = result.scalar_one_or_none()
-        if payment:
-            await db.delete(payment)
+            result = await db.execute(q)
+            for payment in result.scalars().all():
+                await db.delete(payment)
+            await db.flush()
+    else:
+        await db.delete(item)
+        await db.flush()
 
-    await db.delete(item)
-    await db.flush()
     return True
 

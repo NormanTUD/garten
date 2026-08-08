@@ -10,7 +10,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship, declared_attr
+from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from app.database import Base
 
@@ -82,11 +82,11 @@ class GardenExpense(Base):
     category: Mapped["ExpenseCategory | None"] = relationship(lazy="selectin")
 
     @declared_attr
-    def user(cls) -> Mapped["User"]:
+    def user(cls) -> Mapped["User"]:  # noqa: F821
         return relationship("User", foreign_keys=[cls.user_id], lazy="selectin")
 
     @declared_attr
-    def confirmed_by(cls) -> Mapped["User | None"]:
+    def confirmed_by(cls) -> Mapped["User | None"]:  # noqa: F821
         return relationship("User", foreign_keys=[cls.confirmed_by_id], lazy="selectin")
 
 

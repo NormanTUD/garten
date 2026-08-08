@@ -2,7 +2,6 @@ from httpx import AsyncClient
 
 from tests.conftest import auth_header
 
-
 # ─── Audit Logging ────────────────────────────────────────────────
 
 async def test_api_calls_are_logged(client: AsyncClient, admin_user):
@@ -58,7 +57,7 @@ async def test_audit_log_masks_passwords(client: AsyncClient, admin_user):
     response = await client.get("/api/audit/logs", headers=auth_header(token))
     logs = response.json()
 
-    login_logs = [l for l in logs if l["endpoint"] == "/api/auth/login"]
+    login_logs = [entry for entry in logs if entry["endpoint"] == "/api/auth/login"]
     assert len(login_logs) >= 1
 
     body = login_logs[0]["request_body"]
@@ -75,7 +74,7 @@ async def test_audit_log_records_user_id(client: AsyncClient, admin_user):
     response = await client.get("/api/audit/logs", headers=auth_header(token))
     logs = response.json()
 
-    me_logs = [l for l in logs if l["endpoint"] == "/api/auth/me"]
+    me_logs = [entry for entry in logs if entry["endpoint"] == "/api/auth/me"]
     assert len(me_logs) >= 1
     assert me_logs[0]["user_id"] == user.id
 
@@ -93,7 +92,7 @@ async def test_unauthenticated_requests_logged_without_user(client: AsyncClient,
     response = await client.get("/api/audit/logs", headers=auth_header(token))
     logs = response.json()
 
-    login_logs = [l for l in logs if l["endpoint"] == "/api/auth/login"]
+    login_logs = [entry for entry in logs if entry["endpoint"] == "/api/auth/login"]
     assert len(login_logs) >= 1
     assert login_logs[0]["user_id"] is None
 
@@ -215,6 +214,6 @@ async def test_health_endpoint_not_logged(client: AsyncClient, admin_user):
 
     response = await client.get("/api/audit/logs", headers=auth_header(token))
     logs = response.json()
-    health_logs = [l for l in logs if l["endpoint"] == "/api/health"]
+    health_logs = [entry for entry in logs if entry["endpoint"] == "/api/health"]
     assert len(health_logs) == 0
 

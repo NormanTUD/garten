@@ -1,4 +1,3 @@
-from datetime import datetime
 from sqlalchemy import (
     Boolean,
     Column,
@@ -10,6 +9,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 

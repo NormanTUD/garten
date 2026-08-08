@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 
@@ -31,7 +31,6 @@ from app.finance.schemas import (
     StandingOrderUpdate,
 )
 
-
 category_router = APIRouter(prefix="/api/finance/categories", tags=["finance"])
 recurring_router = APIRouter(prefix="/api/finance/recurring", tags=["finance"])
 expense_router = APIRouter(prefix="/api/finance/expenses", tags=["finance"])
@@ -54,12 +53,12 @@ async def list_categories(user: CurrentUser, db: DBSession, active_only: bool = 
 async def create_category(data: ExpenseCategoryCreate, user: CurrentUser, db: DBSession):
     try:
         return await service.create_category(db, data)
-    except IntegrityError:
+    except IntegrityError as err:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Category '{data.name}' already exists",
-        )
+        ) from err
 
 
 @category_router.patch("/{category_id}", response_model=ExpenseCategoryRead)
@@ -130,9 +129,10 @@ async def create_expense(data: GardenExpenseCreate, user: CurrentUser, db: DBSes
 
     # If non-admin creates a shared expense → notify all admins
     if data.is_shared and user.role != "admin":
-        from app.messaging import service as msg_service
-        from app.auth.models import User
         from sqlalchemy import select
+
+        from app.auth.models import User
+        from app.messaging import service as msg_service
 
         result = await db.execute(
             select(User).where(User.role == "admin").where(User.is_active.is_(True))
@@ -165,6 +165,7 @@ async def create_expense(data: GardenExpenseCreate, user: CurrentUser, db: DBSes
 async def confirm_expense(expense_id: int, admin: AdminUser, db: DBSession):
     """Admin confirms a shared expense. Marks related messages as read."""
     from sqlalchemy import select, update
+
     from app.finance.models import GardenExpense
     from app.messaging.models import Message
 
@@ -214,6 +215,7 @@ async def confirm_expense(expense_id: int, admin: AdminUser, db: DBSession):
 async def unconfirm_expense(expense_id: int, admin: AdminUser, db: DBSession):
     """Admin revokes confirmation of a shared expense."""
     from sqlalchemy import select
+
     from app.finance.models import GardenExpense
 
     result = await db.execute(select(GardenExpense).where(GardenExpense.id == expense_id))
@@ -281,12 +283,15 @@ async def create_payment(data: MemberPaymentCreate, user: CurrentUser, db: DBSes
     - Normal user: payment is for themselves
     - Admin: can set for_user_id to credit another user
     """
-    if data.for_user_id is not None and data.for_user_id != user.id:
-        if user.role != "admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admin can create payments for other users",
-            )
+    if (
+        data.for_user_id is not None
+        and data.for_user_id != user.id
+        and user.role != "admin"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin can create payments for other users",
+        )
     # If no for_user_id set, it's for the current user
     if data.for_user_id is None:
         data.for_user_id = user.id
@@ -470,10 +475,12 @@ async def skip_month(order_id: int, data: StandingOrderSkipCreate, user: AdminUs
     try:
         skip = await service.add_skip(db, order_id, data)
         return skip
-    except IntegrityError:
+    except IntegrityError as err:
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                            detail=f"Month {data.year}-{data.month:02d} already skipped")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Month {data.year}-{data.month:02d} already skipped",
+        ) from err
 
 
 @standing_router.delete("/{order_id}/skip/{skip_id}", status_code=status.HTTP_204_NO_CONTENT)

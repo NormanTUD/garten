@@ -1,18 +1,17 @@
 from datetime import date
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.models import User
+from app.duty.service import get_overview as get_duty_overview
 from app.finance.models import (
     GardenExpense,
     MemberPayment,
     RecurringCost,
     StandingOrder,
-    StandingOrderSkip,
 )
 from app.finance.schemas import GardenFundOverview, MemberBalance
-from app.duty.service import get_overview as get_duty_overview
 
 
 def _months_active_in_year(

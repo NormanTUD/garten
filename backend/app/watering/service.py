@@ -11,7 +11,6 @@ from app.watering.schemas import (
     WateringEventUpdate,
 )
 
-
 # ─── Watering Events ─────────────────────────────────────────────
 
 async def get_all_watering_events(

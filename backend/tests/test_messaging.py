@@ -1,4 +1,3 @@
-import pytest
 from httpx import AsyncClient
 
 
@@ -129,6 +128,73 @@ async def test_archive_message(client: AsyncClient, admin_user, normal_user):
                               params={"include_archived": True})
     ids2 = [m["id"] for m in inbox2.json()]
     assert msg_id in ids2
+
+
+async def test_mark_message_unread_persists(client: AsyncClient, admin_user, normal_user):
+    """Regression: setting is_read=False must persist (was being silently dropped)."""
+    _, admin_token = admin_user
+    user, user_token = normal_user
+
+    create_resp = await client.post("/api/messages/", headers=auth_header(admin_token), json={
+        "recipient_id": user.id, "subject": "Toggle me", "body": "Body",
+    })
+    msg_id = create_resp.json()["id"]
+
+    # Mark as read
+    resp = await client.patch(f"/api/messages/{msg_id}", headers=auth_header(user_token), json={
+        "is_read": True,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["is_read"] is True
+
+    # Unread count must be 0
+    count_resp = await client.get("/api/messages/unread-count", headers=auth_header(user_token))
+    assert count_resp.json()["count"] == 0
+
+    # Now unmark – the bug was that this silently re-set to True on refresh
+    resp = await client.patch(f"/api/messages/{msg_id}", headers=auth_header(user_token), json={
+        "is_read": False,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["is_read"] is False
+
+    # Re-fetching via list (NOT GET /{id}, which auto-marks as read) must confirm persistence
+    list_resp = await client.get("/api/messages/", headers=auth_header(user_token))
+    msg = next(m for m in list_resp.json() if m["id"] == msg_id)
+    assert msg["is_read"] is False
+
+    # Unread count must be 1 again
+    count_resp = await client.get("/api/messages/unread-count", headers=auth_header(user_token))
+    assert count_resp.json()["count"] == 1
+
+
+async def test_unarchive_message_persists(client: AsyncClient, admin_user, normal_user):
+    """Regression: setting is_archived=False must persist."""
+    _, admin_token = admin_user
+    user, user_token = normal_user
+
+    create_resp = await client.post("/api/messages/", headers=auth_header(admin_token), json={
+        "recipient_id": user.id, "subject": "Archive/Unarchive", "body": "Body",
+    })
+    msg_id = create_resp.json()["id"]
+
+    # Archive
+    resp = await client.patch(f"/api/messages/{msg_id}", headers=auth_header(user_token), json={
+        "is_archived": True,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["is_archived"] is True
+
+    # Unarchive
+    resp = await client.patch(f"/api/messages/{msg_id}", headers=auth_header(user_token), json={
+        "is_archived": False,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["is_archived"] is False
+
+    # Must reappear in default inbox
+    inbox = await client.get("/api/messages/", headers=auth_header(user_token))
+    assert msg_id in [m["id"] for m in inbox.json()]
 
 
 async def test_delete_message(client: AsyncClient, admin_user, normal_user):

@@ -1,14 +1,14 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.dependencies import DBSession, CurrentUser, AdminUser
+from app.dependencies import AdminUser, CurrentUser, DBSession
 from app.duty import service
 from app.duty.schemas import (
-    DutyConfigCreate,
-    DutyConfigRead,
-    DutyConfigUpdate,
     DutyAssignmentCreate,
     DutyAssignmentRead,
     DutyAssignmentUpdate,
+    DutyConfigCreate,
+    DutyConfigRead,
+    DutyConfigUpdate,
     DutyLogCreate,
     DutyLogRead,
     DutyOverview,
@@ -101,7 +101,7 @@ async def auto_assign(year: int, user: AdminUser, db: DBSession):
     try:
         assignments = await service.auto_assign_equal(db, year)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     await db.commit()
     return [DutyAssignmentRead.from_model(a) for a in assignments]
 

@@ -2,7 +2,6 @@ from httpx import AsyncClient
 
 from tests.conftest import auth_header
 
-
 # ─── Create Plant ─────────────────────────────────────────────────
 
 async def test_create_plant(client: AsyncClient, admin_user):

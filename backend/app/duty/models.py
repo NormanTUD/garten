@@ -1,4 +1,3 @@
-from datetime import date
 from sqlalchemy import (
     Boolean,
     Column,
@@ -6,11 +5,11 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
-    String,
     Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 

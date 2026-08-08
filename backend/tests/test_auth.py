@@ -2,7 +2,6 @@ from httpx import AsyncClient
 
 from tests.conftest import auth_header
 
-
 # ─── Login ────────────────────────────────────────────────────────
 
 async def test_login_success(client: AsyncClient, admin_user):

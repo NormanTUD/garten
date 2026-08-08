@@ -12,32 +12,8 @@ on:
       - "backend/**"
 
 jobs:
-  #lint:
-  #  name: Lint (Ruff)
-  #  runs-on: ubuntu-latest
-  #  defaults:
-  #    run:
-  #      working-directory: backend
-
-  #  steps:
-  #    - uses: actions/checkout@v4
-
-  #    - name: Set up Python
-  #      uses: actions/setup-python@v5
-  #      with:
-  #        python-version: "3.12"
-
-  #    - name: Install Ruff
-  #      run: pip install ruff
-
-  #    - name: Run Ruff check
-  #      run: ruff check .
-
-  #    - name: Run Ruff format check
-  #      run: ruff format --check .
-
-  test:
-    name: Tests (pytest)
+  lint:
+    name: Lint (Ruff)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -52,31 +28,50 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Run Ruff check
+        run: ruff check .
+
+      - name: Run Ruff format check
+        run: ruff format --check .
+
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DEBUG: "true"
+      SECRET_KEY: "ci-test-secret-key-not-for-production-1234567890"
+      DATABASE_URL: "sqlite+aiosqlite:///./data/test.db"
+      FIRST_ADMIN_USERNAME: "admin"
+      FIRST_ADMIN_PASSWORD: "admin123"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
-      - name: Run tests
-        env:
-          APP_NAME: "GartenApp"
-          APP_VERSION: "0.1.0"
-          DEBUG: "true"
-          SECRET_KEY: "ci-test-secret-key-not-for-production"
-          DATABASE_URL: "sqlite:///data/test.db"
-          ASYNC_DATABASE_URL: "sqlite+aiosqlite:///data/test.db"
-          FIRST_ADMIN_USERNAME: "admin"
-          FIRST_ADMIN_PASSWORD: "admin123"
-        run: |
-          mkdir -p data uploads
-          pytest tests/ -v --tb=short
+      - name: Prepare data dirs
+        run: mkdir -p data uploads
 
       - name: Run tests with coverage
-        env:
-          APP_NAME: "GartenApp"
-          APP_VERSION: "0.1.0"
-          DEBUG: "true"
-          SECRET_KEY: "ci-test-secret-key-not-for-production"
-          DATABASE_URL: "sqlite:///data/test.db"
-          ASYNC_DATABASE_URL: "sqlite+aiosqlite:///data/test.db"
-          FIRST_ADMIN_USERNAME: "admin"
-          FIRST_ADMIN_PASSWORD: "admin123"
-        run: pytest tests/ --cov=app --cov-report=term-missing --tb=short
+        run: pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=65 --tb=short
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-backend
+          path: backend/coverage.xml

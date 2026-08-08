@@ -2,7 +2,6 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ─── Bed ──────────────────────────────────────────────────────────
 
 class BedCreate(BaseModel):

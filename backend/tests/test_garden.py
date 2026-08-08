@@ -2,7 +2,6 @@ from httpx import AsyncClient
 
 from tests.conftest import auth_header
 
-
 # ─── Create Garden ────────────────────────────────────────────────
 
 async def test_create_garden(client: AsyncClient, admin_user):

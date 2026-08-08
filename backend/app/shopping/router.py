@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException, status
 
-from app.dependencies import DBSession, CurrentUser, AdminUser
+from app.dependencies import AdminUser, CurrentUser, DBSession
 from app.shopping import service
 from app.shopping.schemas import (
     ShoppingItemCreate,
+    ShoppingItemPurchase,
     ShoppingItemRead,
     ShoppingItemUpdate,
-    ShoppingItemPurchase,
 )
 
 router = APIRouter(prefix="/api/shopping", tags=["shopping"])

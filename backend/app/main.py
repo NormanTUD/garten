@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.database import async_session_factory, create_all_tables
+from app.database import async_session_factory
 from app.middleware.audit_log import AuditLogMiddleware
 
 logger = logging.getLogger("gartenapp")
@@ -18,10 +18,9 @@ async def lifespan(app: FastAPI):
     Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
     Path("data").mkdir(parents=True, exist_ok=True)
 
-    # ❌ DIESE 3 ZEILEN ENTFERNEN:
-    # if settings.debug:
-    #     await create_all_tables()
-    #     logger.info("Database tables created (debug mode)")
+    # Auto-create tables if missing (SQLite only, development-friendly).
+    # For PostgreSQL, run `alembic upgrade head` before starting the app.
+    await _ensure_schema()
 
     from app.auth.service import ensure_admin_exists
     from app.messaging.default_rules import seed_default_rules
@@ -33,6 +32,41 @@ async def lifespan(app: FastAPI):
 
     yield
     logger.info("Shutting down %s", settings.app_name)
+
+
+async def _ensure_schema() -> None:
+    """Create all tables if they do not yet exist.
+
+    SQLite-friendly: tests/dev environments can boot without running
+    Alembic manually. Alembic remains the source of truth for production
+    migrations – run `alembic upgrade head` as part of your deploy.
+    """
+    from sqlalchemy import inspect, text
+
+    from app.database import async_session_factory, create_all_tables, engine
+
+    if settings.is_sqlite:
+        async with engine.begin() as conn:
+            tables_exist = await conn.run_sync(
+                lambda sync_conn: inspect(sync_conn).get_table_names()
+            )
+        if not tables_exist:
+            logger.info("Empty database detected, creating tables...")
+            await create_all_tables()
+            return
+
+    # For non-SQLite: try a cheap query to detect missing schema
+    try:
+        async with async_session_factory() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as err:
+        logger.error(
+            "Database not reachable or schema missing: %s. "
+            "Run `alembic upgrade head` before starting the app.",
+            err,
+        )
+        raise
+
 
 def create_app(audit_session_factory=None) -> FastAPI:
     app = FastAPI(
@@ -57,10 +91,14 @@ def setup_logging() -> None:
 
 def setup_middleware(app: FastAPI, audit_session_factory=None) -> None:
     app.add_middleware(AuditLogMiddleware, session_factory=audit_session_factory)
+    cors_origins = settings.cors_origins_list
+    allow_credentials = "*" not in cors_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.debug else [],
-        allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+        allow_origins=cors_origins,
+        allow_credentials=allow_credentials,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
 
@@ -68,18 +106,24 @@ def setup_routers(app: FastAPI) -> None:
     from app.audit.router import router as audit_router
     from app.auth.router import router as auth_router
     from app.auth.router import user_router
-    from app.beds.router import planting_router, router as beds_router
+    from app.beds.router import planting_router
+    from app.beds.router import router as beds_router
+    from app.duty.router import router as duty_router
     from app.finance.router import (
-        category_router, recurring_router, expense_router,
-        payment_router, fund_router, receipt_router, standing_router,
+        category_router,
+        expense_router,
+        fund_router,
+        payment_router,
+        receipt_router,
+        recurring_router,
+        standing_router,
     )
     from app.garden.router import router as garden_router
     from app.harvest.router import router as harvest_router
     from app.messaging.router import message_router, rule_router
     from app.plants.router import router as plants_router
-    from app.watering.router import fertilizing_router, watering_router
-    from app.duty.router import router as duty_router
     from app.shopping.router import router as shopping_router
+    from app.watering.router import fertilizing_router, watering_router
 
     app.include_router(shopping_router)
     app.include_router(duty_router)
