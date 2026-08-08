@@ -1,0 +1,104 @@
+name: Smoke Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/smoke.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+
+jobs:
+  backend-smoke:
+    name: Backend smoke (SQLite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DEBUG: "false"
+      SECRET_KEY: "ci-test-secret-key-not-for-production-1234567890"
+      DATABASE_URL: "sqlite+aiosqlite:///./data/smoke.db"
+      FIRST_ADMIN_USERNAME: "admin"
+      FIRST_ADMIN_PASSWORD: "admin123"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Prepare data dirs
+        run: mkdir -p data uploads
+
+      - name: Boot the API in background
+        run: |
+          nohup .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8765 > server.log 2>&1 &
+          echo "Server PID: $!"
+          sleep 4
+
+      - name: Wait for health endpoint
+        run: |
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:8765/api/health > /dev/null; then
+              echo "API healthy"
+              curl -s http://127.0.0.1:8765/api/health
+              exit 0
+            fi
+            echo "Waiting for API..."
+            sleep 1
+          done
+          cat server.log
+          exit 1
+
+      - name: Verify OpenAPI docs are served
+        run: |
+          curl -fsS http://127.0.0.1:8765/openapi.json | python -c "import json, sys; data = json.load(sys.stdin); assert 'paths' in data; print(f'OpenAPI: {len(data[\"paths\"])} paths')"
+
+      - name: Smoke-test login & protected endpoint
+        run: |
+          .venv/bin/python - <<'PY'
+          import httpx, time
+
+          base = "http://127.0.0.1:8765/api"
+
+          # Login
+          r = httpx.post(f"{base}/auth/login", json={"username": "admin", "password": "admin123"}, timeout=10)
+          assert r.status_code == 200, f"login failed: {r.status_code} {r.text}"
+          token = r.json()["access_token"]
+          headers = {"Authorization": f"Bearer {token}"}
+
+          # /me
+          r = httpx.get(f"{base}/auth/me", headers=headers, timeout=10)
+          assert r.status_code == 200, r.text
+          assert r.json()["username"] == "admin"
+
+          # Gardens list
+          r = httpx.get(f"{base}/gardens/", headers=headers, timeout=10)
+          assert r.status_code == 200, r.text
+
+          # Plants list
+          r = httpx.get(f"{base}/plants/", headers=headers, timeout=10)
+          assert r.status_code == 200, r.text
+
+          # Unauthorized -> 401
+          r = httpx.get(f"{base}/auth/me", timeout=10)
+          assert r.status_code == 401, r.text
+
+          print("Smoke OK")
+          PY
+
+      - name: Tear down
+        if: always()
+        run: pkill -f "uvicorn app.main:app" || true
