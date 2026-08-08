@@ -1,0 +1,134 @@
+name: IoT & Scheduler
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/devices/**"
+      - "backend/app/cameras/**"
+      - "backend/app/network/**"
+      - "backend/app/valves/**"
+      - "backend/app/timeline/**"
+      - "backend/app/audit/**"
+      - "backend/app/backup/**"
+      - "backend/tests/test_devices.py"
+      - "backend/tests/test_cameras.py"
+      - "backend/tests/test_network.py"
+      - "backend/tests/test_valves.py"
+      - "backend/tests/test_timeline_audit.py"
+      - "backend/tests/test_backup.py"
+      - ".github/workflows/iot.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/app/devices/**"
+      - "backend/app/cameras/**"
+      - "backend/app/network/**"
+      - "backend/app/valves/**"
+      - "backend/app/timeline/**"
+
+jobs:
+  iot-tests:
+    name: IoT module tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DEBUG: "true"
+      SECRET_KEY: "ci-test-secret-key-not-for-production-1234567890"
+      DATABASE_URL: "sqlite+aiosqlite:///./data/iot.db"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run device tests
+        run: pytest tests/test_devices.py -v --tb=short -p no:logging
+
+      - name: Run camera tests
+        run: pytest tests/test_cameras.py -v --tb=short -p no:logging
+
+      - name: Run network allowlist tests
+        run: pytest tests/test_network.py -v --tb=short -p no:logging
+
+      - name: Run valve tests
+        run: pytest tests/test_valves.py -v --tb=short -p no:logging
+
+      - name: Run timeline & audit tests
+        run: pytest tests/test_timeline_audit.py -v --tb=short -p no:logging
+
+      - name: Run backup tests
+        run: pytest tests/test_backup.py -v --tb=short -p no:logging
+
+  scheduler-smoke:
+    name: Scheduler smoke test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DEBUG: "false"
+      SECRET_KEY: "ci-test-secret-key-not-for-production-1234567890"
+      DATABASE_URL: "sqlite+aiosqlite:///./data/scheduler.db"
+      FIRST_ADMIN_USERNAME: "admin"
+      FIRST_ADMIN_PASSWORD: "admin123"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Prepare data dirs
+        run: mkdir -p data uploads
+
+      - name: Boot the API in background
+        run: |
+          nohup .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8766 > server.log 2>&1 &
+          echo "Server PID: $!"
+          sleep 5
+
+      - name: Verify new endpoints are reachable
+        run: |
+          for path in /api/health /openapi.json; do
+            curl -fsS http://127.0.0.1:8766$path > /dev/null
+            echo "OK: $path"
+          done
+
+      - name: Verify IoT endpoints exist in OpenAPI
+        run: |
+          .venv/bin/python - <<'PY'
+          import httpx
+          data = httpx.get("http://127.0.0.1:8766/openapi.json", timeout=10).json()
+          expected = {
+              "/api/devices/", "/api/devices/events/all",
+              "/api/cameras/", "/api/cameras/persons",
+              "/api/network/devices", "/api/network/lookup",
+              "/api/valves/", "/api/valves/{valve_id}/command",
+              "/api/device/valves/poll", "/api/device/camera/image",
+              "/api/timeline/", "/api/audit/chain/verify",
+              "/api/backup/export", "/api/backup/import",
+          }
+          missing = expected - set(data["paths"].keys())
+          assert not missing, f"missing endpoints: {missing}"
+          print(f"OK: {len(expected)} IoT endpoints registered")
+          PY
+
+      - name: Tear down
+        if: always()
+        run: pkill -f "uvicorn app.main:app" || true
