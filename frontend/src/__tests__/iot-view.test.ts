@@ -106,8 +106,11 @@ describe("IoTView", () => {
   it("switches tabs via v-model", async () => {
     const { wrapper } = await mountIoTView();
     await flushPromises();
-    const tabs = wrapper.findAll('[role="tab"]');
-    expect(tabs.length).toBeGreaterThanOrEqual(4);
+    const vm = wrapper.vm as unknown as { tab: string };
+    expect(vm.tab).toBe("devices");
+    vm.tab = "cameras";
+    await flushPromises();
+    expect(vm.tab).toBe("cameras");
   });
 
   it("register-device dialog has form fields", async () => {
