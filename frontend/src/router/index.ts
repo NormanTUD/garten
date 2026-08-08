@@ -45,6 +45,12 @@ const routes = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
+    path: "/admin/keys",
+    name: "admin-keys",
+    component: () => import("@/views/ApiKeysView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
 	  path: "/messages",
 	  name: "messages",
 	  component: () => import("@/views/MessagesView.vue"),

@@ -23,6 +23,7 @@ const navItems = [
 
 const adminItems = [
   { title: "Administration", icon: "mdi-cog", to: "/admin" },
+  { title: "API-Schlüssel", icon: "mdi-key", to: "/admin/keys" },
   { title: "IoT & Steuerung", icon: "mdi-chip", to: "/iot" },
 ];
 </script>
