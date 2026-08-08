@@ -121,6 +121,7 @@ def setup_middleware(app: FastAPI, audit_session_factory=None) -> None:
 
 def setup_routers(app: FastAPI) -> None:
     from app.audit.router import router as audit_router
+    from app.auth.apikeys.router import router as apikeys_router
     from app.auth.router import router as auth_router
     from app.auth.router import user_router
     from app.backup.router import router as backup_router
@@ -173,6 +174,7 @@ def setup_routers(app: FastAPI) -> None:
     app.include_router(message_router)
     app.include_router(rule_router)
     app.include_router(backup_router)
+    app.include_router(apikeys_router)
     # New IoT / automation endpoints
     app.include_router(devices_router)
     app.include_router(devices_device_router)

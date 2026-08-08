@@ -17,8 +17,10 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 
+from app.auth.apikeys.security import Principal, get_current_principal, require_scope
+from app.auth.permissions import Scope
 from app.cameras import service
-from app.cameras.models import CameraAlert
+from app.cameras.models import Camera, CameraAlert, CapturedImage, KnownPerson
 from app.cameras.schemas import (
     CameraAlertCreate,
     CameraAlertRead,

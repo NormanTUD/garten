@@ -59,6 +59,7 @@ class Base(DeclarativeBase):
 async def create_all_tables() -> None:
     from app.audit import models as _audit  # noqa: F401
     from app.auth import models as _auth  # noqa: F401
+    from app.auth.apikeys import models as _apikeys  # noqa: F401
     from app.beds import models as _beds  # noqa: F401
     from app.cameras import models as _cameras  # noqa: F401
     from app.devices import models as _devices  # noqa: F401
