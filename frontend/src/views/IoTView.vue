@@ -357,14 +357,19 @@ onMounted(async () => {
     </v-dialog>
 
     <!-- ── Show API key once ───────────────────────────────────── -->
-    <v-dialog v-model="newApiKey" max-width="600" persistent>
+    <v-dialog
+      :model-value="newApiKey !== null"
+      max-width="600"
+      persistent
+      @update:model-value="(v) => { if (!v) newApiKey = null; }"
+    >
       <v-card>
         <v-card-title class="text-warning">
           ⚠ API-Key – bitte sofort notieren!
         </v-card-title>
         <v-card-text>
           <p>Der API-Key wird nur <strong>einmal</strong> angezeigt.</p>
-          <v-text-field :model-value="newApiKey" readonly class="mt-3" />
+          <v-text-field :model-value="newApiKey ?? ''" readonly class="mt-3" />
         </v-card-text>
         <v-card-actions>
           <v-spacer />

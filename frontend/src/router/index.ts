@@ -62,6 +62,18 @@ const routes = [
     component: () => import("@/views/ShoppingView.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/iot",
+    name: "iot",
+    component: () => import("@/views/IoTView.vue"),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: "/timeline-view",
+    name: "timeline-view",
+    component: () => import("@/views/TimelineView.vue"),
+    meta: { requiresAuth: true },
+  },
 
 ];
 
