@@ -53,6 +53,10 @@ exclude = ["alembic*", "tests*"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "-m 'not e2e'"
+markers = [
+    "e2e: end-to-end tests that boot the full stack (run with --run-e2e)",
+]
 
 [tool.ruff]
 target-version = "py312"

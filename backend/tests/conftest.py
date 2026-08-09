@@ -1,3 +1,13 @@
+import os
+
+# Configure test env BEFORE any app import so the config validator doesn't
+# reject the default SECRET_KEY during tests.
+os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault("SECRET_KEY", "ci-test-secret-key-not-for-production-1234567890")
+os.environ.setdefault("FIRST_ADMIN_USERNAME", "admin")
+os.environ.setdefault("FIRST_ADMIN_PASSWORD", "admin123")
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+
 from collections.abc import AsyncGenerator
 
 import pytest

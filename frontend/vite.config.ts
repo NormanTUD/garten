@@ -109,6 +109,17 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
+    // In dev mode the SPA talks to the FastAPI backend. Apache does this
+    // for us in production; here we forward /api → http://localhost:8000.
+    proxy: {
+      "/api": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
+      "/openapi.json": "http://localhost:8000",
+      "/docs": "http://localhost:8000",
+      "/redoc": "http://localhost:8000",
+    },
   },
 });
 

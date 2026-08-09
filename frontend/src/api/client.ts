@@ -87,11 +87,24 @@ class ApiClient {
 
     const url = this.buildUrl(path, params);
 
-    let response = await fetch(url, {
-      method,
-      headers: requestHeaders,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method,
+        headers: requestHeaders,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (networkErr) {
+      // Network / CORS / proxy failure – surface a clear error instead
+      // of letting the generic TypeError bubble up.
+      throw {
+        status: 0,
+        detail:
+          "Backend nicht erreichbar. Läuft der Server auf Port 8000? " +
+          "(Im Dev-Modus muss der Vite-Proxy /api → localhost:8000 weiterleiten.)",
+        cause: String(networkErr),
+      } as ApiError;
+    }
 
     // If 401, try to refresh token and retry once
     if (response.status === 401 && token) {
@@ -111,12 +124,21 @@ class ApiClient {
       return undefined as T;
     }
 
-    const data = await response.json();
+    let data: unknown = null;
+    try {
+      data = await response.json();
+    } catch {
+      // empty body – fall through
+    }
 
     if (!response.ok) {
+      const detail =
+        (data && typeof data === "object" && "detail" in data
+          ? (data as { detail: unknown }).detail
+          : null) || `HTTP ${response.status}`;
       const error: ApiError = {
         status: response.status,
-        detail: data.detail || "Ein Fehler ist aufgetreten",
+        detail: typeof detail === "string" ? detail : JSON.stringify(detail),
       };
       throw error;
     }

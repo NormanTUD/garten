@@ -16,10 +16,12 @@ engine_kwargs: dict = {
 }
 
 if settings.is_sqlite:
-    # SQLite: single writer, WAL mode
+    # SQLite: single writer, WAL mode. In-memory SQLite uses a
+    # StaticPool which doesn't accept pool_size / max_overflow.
     engine_kwargs["connect_args"] = {"timeout": 30}
-    engine_kwargs["pool_size"] = 1
-    engine_kwargs["max_overflow"] = 0
+    if ":memory:" not in settings.async_database_url:
+        engine_kwargs["pool_size"] = 1
+        engine_kwargs["max_overflow"] = 0
 else:
     # PostgreSQL: concurrent connections
     engine_kwargs["pool_size"] = 10
